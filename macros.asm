@@ -30,29 +30,30 @@
 	do_lcd_command 0b11000000 ;change to 2 line
 .endmacro
 
+;Given a 16bit cseg address, will write the contained string to the screen
 .macro do_lcd_write_str
-push r17
-push zl
-push zh
-ldi zl, low(@0<<1)
-ldi zh, high(@0<<1)
-writeLoop:
-lpm r17, z+ 
-cpi r17, 1
-brne endLineCheck
-do_lcd_bottom
-rjmp writeLoop
-endLineCheck:
-cpi r17, 0
-brne redoLoop
-rjmp endWrite
-redoLoop:
-do_lcd_data r17
-rjmp writeLoop
-endWrite:
-pop zh
-pop zl
-pop r17
+	push r17
+	push zl
+	push zh
+	ldi zl, low(@0<<1)
+	ldi zh, high(@0<<1)
+	writeLoop:
+	lpm r17, z+ 
+	cpi r17, 1
+	brne endLineCheck
+	do_lcd_bottom
+	rjmp writeLoop
+	endLineCheck:
+	cpi r17, 0
+	brne redoLoop
+	rjmp endWrite
+	redoLoop:
+	do_lcd_data r17
+	rjmp writeLoop
+	endWrite:
+	pop zh
+	pop zl
+	pop r17
 .endmacro
 
 ;Toggles TIMER2 with value passed in 
