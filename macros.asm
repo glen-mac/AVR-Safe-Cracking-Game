@@ -56,7 +56,7 @@
 	pop r17
 .endmacro
 
-;Toggles TIMER2 with value passed in 
+;Toggles a timer with value passed in (0 or 1<<TIMSKN where N is a timer..)
 .macro toggle
 	push temp
 	ldi temp, @1
