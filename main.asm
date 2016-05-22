@@ -1,5 +1,6 @@
 .include "m2560def.inc"
 .include "macros.asm"
+;A countdown Macro is needed because it will clear the screen then display the new time.  
 
 ;Variable debounce delay
 .equ debDELAY = 800 
@@ -29,7 +30,10 @@ jmp Timer2OVF	;debounce timer for push buttons
 jmp Timer0OVF
 ;STRING LIST:  (1 denotes a new line, 0 denotes end of second line)
 str_home_msg: .db "2121 16s1", 1, "Safe Cracker", 0
-
+str_findposition_msg: .db "Find POT POS", 1, "Remaining:", 0
+str_timeout_msg: .db "Game over", 1, "You Lose!", 0 
+str_reset_msg: .db "Reset POT to 0", 1, "Remaining ", 0
+str_countdown_msg: .db "Starting in ", 1, 0
 	
 RESET:
 	;;;;;;;;prepare stack;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -72,6 +76,7 @@ colloop:
 	breq main; If all keys are scanned, repeat.
 	sts PORTL, cmask; Otherwise, scan a column.
 	ldi temp, 0xFF; Slow down the scan operation.
+
 delay:
 	dec temp
 	brne delay
@@ -81,6 +86,7 @@ delay:
 	breq nextcol; If yes, find which row - is low
 	ldi rmask, INITROWMASK ; Initialize for row check
 	clr row
+
 rowloop:
 	cpi row, 4
 	breq nextcol ; the row scan is over.
@@ -117,8 +123,26 @@ star:
 zero:
 	ldi temp, 0; Set to zero
 	rjmp convert_end
-letters:
-	rjmp main
+letters:	
+	A:
+	cpi row, 0 ;A
+	brne B
+	ldi countdown, 20
+	rjmp ResetPot
+	B:
+	cpi row, 1 ;B
+	brne C
+	ldi countdown, 15
+	rjmp ResetPot
+	C:
+	cpi row, 2 ;C
+	brne D
+	ldi countdown 10
+	rjmp ResetPot
+	D:						
+	ldi countdown, 6
+	rjmp ResetPot
+
 convert_end:
 	rjmp main
 
@@ -155,85 +179,15 @@ Timer2OVF:  ;the timer for push button debouncing
 	reti
 
 ResetPot:
-	toggle TIMSK0, 0
-	do_lcd_data_i 'R'
-	do_lcd_data_i 'e'
-	do_lcd_data_i 's'
-	do_lcd_data_i 'e'
-	do_lcd_data_i 't'
-	do_lcd_data_i ' '
-	do_lcd_data_i 'P'
-	do_lcd_data_i 'O'
-	do_lcd_data_i 'T'
-	do_lcd_data_i ' '
-	do_lcd_data_i 't'
-	do_lcd_data_i 'o'
-	do_lcd_data_i ' '
-	do_lcd_data_i '0'
+	do_lcd_write_str str_reset_msg
+	do_lcd_data countdown
 
-	do_lcd_command 0b11000000
-
-	do_lcd_data_i 'R'
-	do_lcd_data_i 'e'
-	do_lcd_data_i 'm'
-	do_lcd_data_i 'a'
-	do_lcd_data_i 'i'
-	do_lcd_data_i 'n'
-	do_lcd_data_i 'i'
-	do_lcd_data_i 'n'
-	do_lcd_data_i 'g'
-	do_lcd_data_i ':'
-	do_lcd_data_i ' '
 
 Timeout: 
-
-	do_lcd_data_i 'G'
-	do_lcd_data_i 'a'
-	do_lcd_data_i 'm'
-	do_lcd_data_i 'e'
-	do_lcd_data_i ' '
-	do_lcd_data_i 'o'
-	do_lcd_data_i 'v'
-	do_lcd_data_i 'e'
-	do_lcd_data_i 'r'
-
-	do_lcd_command 0b11000000
-	
-	do_lcd_data_i 'Y'
-	do_lcd_data_i 'o'
-	do_lcd_data_i 'u'
-	do_lcd_data_i ' '
-	do_lcd_data_i 'L'
-	do_lcd_data_i 'o'
-	do_lcd_data_i 's'
-	do_lcd_data_i 'e'
-	do_lcd_data_i '!'
+	do_lcd_write_str str_timeout_msg
 	
 FindPos: 
-	do_lcd_data_i 'F'
-	do_lcd_data_i 'i'
-	do_lcd_data_i 'n'
-	do_lcd_data_i 'd'
-	do_lcd_data_i ' '
-	do_lcd_data_i 'P'
-	do_lcd_data_i 'O'
-	do_lcd_data_i 'T'
-	do_lcd_data_i ' '
-	do_lcd_data_i 'P'
-	do_lcd_data_i 'o'
-	do_lcd_data_i 's'
-	do_lcd_command 0b11000000
-	do_lcd_data_i 'R'
-	do_lcd_data_i 'e'
-	do_lcd_data_i 'm'
-	do_lcd_data_i 'a'
-	do_lcd_data_i 'i'
-	do_lcd_data_i 'n'
-	do_lcd_data_i 'i'
-	do_lcd_data_i 'n'
-	do_lcd_data_i 'g'
-	do_lcd_data_i ':'
-
+	do_lcd_write_str str_findposition_msg
 	
 EXT_INT_R:
 	;;;;HOW TO USE PUSH BUTTONS:
@@ -261,18 +215,7 @@ EXT_INT_L:
 	;cpse debounce, 1	;if still debouncing then leave
 	reti
 	;debounced
-	push temp
-	do_lcd_command 0b00000001 ;clear the screen
-	do_lcd_data_i '2'
-	do_lcd_data_i '1'
-	do_lcd_data_i '2'
-	do_lcd_data_i '1'
-	do_lcd_data_i ' '
-	do_lcd_data_i '1'
-	do_lcd_data_i '6'
-	do_lcd_data_i 's'    
-	do_lcd_data_i '1'
-	do_lcd_command 0b11000000 ;change to 2 line    
+	push temp  
 	clr debtimerlo	;reset debounce timer
 	clr debtimerhi
 	clr debounce
@@ -284,18 +227,7 @@ EXT_INT_L:
 
 countdownfunc:
 	ldi countdown, 3 
-	do_lcd_data_i 'S'
-	do_lcd_data_i 't'
-	do_lcd_data_i 'a'
-	do_lcd_data_i 'r'
-	do_lcd_data_i 't'
-	do_lcd_data_i 'i'
-	do_lcd_data_i 'n'
-	do_lcd_data_i 'g'    
-	do_lcd_data_i ' '
-	do_lcd_data_i 'i'
-	do_lcd_data_i 'n'
-	do_lcd_data_i ' '
+	do_lcd_write_str str_countdown_msg
 	toggle TIMSK0, 1<<TOIE0
 	ret
 
