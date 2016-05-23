@@ -1,15 +1,21 @@
+;;;;;;;;;;;;; TO DO ;;;;;;;;
+;;A countdown Macro is needed because 
+;;it will clear the screen then display the new time. 
+;;
+;;Do Pot code
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 .include "m2560def.inc"
 .include "macros.asm"
-;A countdown Macro is needed because it will clear the screen then display the new time.  
 
-;Variable debounce delay
-.equ debDELAY = 800 
-.equ PORTLDIR = 0xF0 ; PD7 - 4: output, PD3 - 0, input
+;;;;;;;;;;;;CONSTANTS;;;;;;;;;;;;;;;;;;;
+.equ debDELAY = 800 	;Variable debounce delay
+.equ PORTLDIR = 0xF0 	; PD7 - 4: output, PD3 - 0, input
 .equ INITCOLMASK = 0xEF ; scan from the rightmost column,
 .equ INITROWMASK = 0x01 ; scan from the top row
 .equ ROWMASK = 0x0F
-
-.def debounce = r2
+;;;;;;;;;;;;REGISTER DEFINES;;;;;;;;;;;;
+.def debounce = r2  	; debounce flag boolean for push buttons
 .def row = r16 ; current row number
 .def col = r17 ; current column number
 .def rmask = r18 ; mask for current row during scan
@@ -71,12 +77,15 @@ RESET:
 main:
 	rjmp main
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;KEYPAD LOGIC;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 colloop:
 	cpi col, 4
 	breq main; If all keys are scanned, repeat.
 	sts PORTL, cmask; Otherwise, scan a column.
 	ldi temp, 0xFF; Slow down the scan operation.
-
 delay:
 	dec temp
 	brne delay
@@ -86,7 +95,6 @@ delay:
 	breq nextcol; If yes, find which row - is low
 	ldi rmask, INITROWMASK ; Initialize for row check
 	clr row
-
 rowloop:
 	cpi row, 4
 	breq nextcol ; the row scan is over.
@@ -142,11 +150,12 @@ letters:
 	D:						
 	ldi countdown, 6
 	rjmp ResetPot
-
 convert_end:
 	rjmp main
 
-Timer0OVF: 
+
+
+Timer0OVF: ;This is an 8-bit timer
 ;	cpse countdown, 0
 	rjmp conttimer
 	rjmp ResetPot
@@ -182,7 +191,6 @@ ResetPot:
 	do_lcd_write_str str_reset_msg
 	do_lcd_data countdown
 
-
 Timeout: 
 	do_lcd_write_str str_timeout_msg
 	
@@ -195,7 +203,7 @@ EXT_INT_R:
 	;brne endInt
 	;clr debounce
 	;;;;DO STUFF HERE
-	;toggleDebounce 1<<TOIE2
+	;toggle TIMSK2, 1<<TOIE2
 	;endInt:
 	;reti
 
@@ -205,25 +213,9 @@ EXT_INT_L:
 	;brne endInt
 	;clr debounce
 	;;;;DO STUFF HERE
-	;toggleDebounce 1<<TOIE2
+	;toggle TIMSK2, 1<<TOIE2
 	;endInt:
 	;reti
-
-	;;;;check if button is still being debounced
-	;;;;if not then tally the button presses
-	
-	;cpse debounce, 1	;if still debouncing then leave
-	reti
-	;debounced
-	push temp  
-	clr debtimerlo	;reset debounce timer
-	clr debtimerhi
-	clr debounce
-	toggle TIMSK2, 1<<TOIE2
-	rcall countdownfunc
-	pop temp
-	endIntL:
-	reti
 
 countdownfunc:
 	ldi countdown, 3 
@@ -231,5 +223,5 @@ countdownfunc:
 	toggle TIMSK0, 1<<TOIE0
 	ret
 
-
+;;;;;;;LEAVE THIS HERE - NEEDS TO BE INCLUDED LAST!!!;;;;;;;
 .include "LCD.asm"
