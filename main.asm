@@ -3,6 +3,15 @@
 ;;it will clear the screen then display the new time. 
 ;;
 ;;Do Pot code
+;
+;;Consider disabling interrupts for PB1 to prevent even handling code
+;
+;;Put keypad code in Timer0, with 0 prescaler (can disable with toggle macro)
+;;when not needed)
+;;
+;;Scale game loop to 1ms (Tiemr 0)
+;
+;;Set TIMER 3 to 8 bit 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 .include "m2560def.inc"
@@ -14,7 +23,16 @@
 .equ INITCOLMASK = 0xEF ; scan from the rightmost column,
 .equ INITROWMASK = 0x01 ; scan from the top row
 .equ ROWMASK = 0x0F
+.equ stage_start = 0
+.equ stage_countdown = 1
+.equ stage_pot_reset = 2
+.equ stage_pot_find = 3
+.equ stage_code_find = 4
+.equ stage_code_enter = 5
+.equ stage_win = 6
+.equ stage_lose = 7
 ;;;;;;;;;;;;REGISTER DEFINES;;;;;;;;;;;;
+.def screenStage = r3
 .def debounce = r2  	; debounce flag boolean for push buttons
 .def row = r16 ; current row number
 .def col = r17 ; current column number
@@ -22,18 +40,18 @@
 .def cmask = r19 ; mask for current column during scan
 .def temp = r20
 .def temp2 = r21
-.def debtimerlo = r24	;the timer value for debouncing
-.def debtimerhi = r25	;the timer value for debouncing
-.def countdown = r22
+
 
 .cseg
 jmp RESET
 jmp EXT_INT_R	;right push button
 jmp EXT_INT_L	;left push button
+.org OVF0addr
+jmp Timer0OVF	;game loop
 .org OVF2addr
 jmp Timer2OVF	;debounce timer for push buttons
-.org OVF0addr
-jmp Timer0OVF
+.org OVF1addr
+jmp Timer1OVF	;keypad search code
 ;STRING LIST:  (1 denotes a new line, 0 denotes end of second line)
 str_home_msg: .db "2121 16s1", 1, "Safe Cracker", 0
 str_findposition_msg: .db "Find POT POS", 1, "Remaining:", 0
@@ -66,6 +84,8 @@ RESET:
 	do_lcd_command 0b00001110 ; Cursor on, bar, no blink
 	;;;;;;;;prepare MISC;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   	ldi temp, PORTLDIR ; PA7:4/PA3:0, out/in
+	clr screenStage		; initial screen (click left button to start)
+	ldii debounce, 1
 	sts DDRL, temp
 	ser temp
 	out DDRC, temp	;PORTC is for LED bar
@@ -73,19 +93,100 @@ RESET:
 	out PORTC, temp ;BLANK the LED bar
 
 	do_lcd_write_str str_home_msg ;write home message to screen
+	
+halt:
+	rjmp halt ;do nothing forever!
 
-main:
-	rjmp main
+
+Timer0OVF: ;This is an 8-bit timer - Game loop.
+	cpii screenStage, stage_countdown
+	breq countdownSeg
+	cpii screenStage, stage_pot_reset
+	breq potResetSeg
+	cpii screenStage, stage_pot_find
+	breq potFindSeg
+	cpii screenStage, stage_code_find
+	breq codeFindSeg
+	cpii screenStage, stage_code_enter
+	breq codeEnterSeg
+	cpii screenStage, stage_win
+	breq winSeg
+	cpii screenStage, stage_lose
+	breq loseSeg
+
+	countdownSeg:
+	rjmp endTimer0
+
+	potResetSeg:
+	rjmp endTimer0
+
+	potFindSeg:
+	rjmp endTimer0
+
+	codeFindSeg:
+	rjmp endTimer0
+
+	codeEnterSeg:
+	rjmp endTimer0
+
+	winSeg:
+	rjmp endTimer0
+
+	loseSeg:
+	rjmp endTimer0
+
+	countdownfunc:
+		ldi countdown, 3 
+		do_lcd_write_str str_countdown_msg
+		toggle TIMSK0, 1<<TOIE0
+		ret
+
+	ResetPot:
+		do_lcd_write_str str_reset_msg
+		do_lcd_data countdown
+
+	Timeout: 
+		do_lcd_write_str str_timeout_msg
+	
+	FindPos: 
+		do_lcd_write_str str_findposition_msg
+
+	endTimer0:
+	reti
 
 
+Timer2OVF:  ;the timer for push button debouncing
+	push temp
+	adiw debtimerlo, 1
+	ldi temp, high(debDELAY)
+	cpi debtimerlo, low(debDELAY)
+	cpc debtimerhi, temp
+	brne enddeb
+	ldii debounce, 1
+	toggle TIMSK2, 0
+	enddeb:
+	pop temp
+	reti
+
+Timer3OVF: ;keypad loop
+	push col
+	push row
+	push rmask
+	push cmask
+	push temp
+	clr col
+	clr row
+	clr rmask
+	clr cmask
+	clr temp
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;KEYPAD LOGIC;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 colloop:
 	cpi col, 4
-	breq main; If all keys are scanned, repeat.
+	breq endTimer3	; If all keys are scanned, repeat.
 	sts PORTL, cmask; Otherwise, scan a column.
-	ldi temp, 0xFF; Slow down the scan operation.
+	ldi temp, 0xFF	; Slow down the scan operation.
 delay:
 	dec temp
 	brne delay
@@ -151,51 +252,16 @@ letters:
 	ldi countdown, 6
 	rjmp ResetPot
 convert_end:
-	rjmp main
-
-
-
-Timer0OVF: ;This is an 8-bit timer
-;	cpse countdown, 0
-	rjmp conttimer
-	rjmp ResetPot
-	conttimer: 
-	adiw yh:yl, 1
-	cpi YL, low(7812)
-	ldi temp2, high(7812)
-	cpc YH, temp2
-	brne end0
-	ldi temp, '0'
-;	add temp, countdown 
-	;do_lcd_data
-	;dec countdown
-	clr YL
-	clr YH
-	end0:
-	reti
-
-Timer2OVF:  ;the timer for push button debouncing
-	push temp
-	adiw debtimerlo, 1
-	ldi temp, high(debDELAY)
-	cpi debtimerlo, low(debDELAY)
-	cpc debtimerhi, temp
-	brne enddeb
-	ldii debounce, 1
-	toggle TIMSK2, 0
-	enddeb:
+	rjmp endTimer3
+endTimer3:
 	pop temp
+	pop cmask
+	pop rmask
+	pop row
+	pop col
 	reti
 
-ResetPot:
-	do_lcd_write_str str_reset_msg
-	do_lcd_data countdown
 
-Timeout: 
-	do_lcd_write_str str_timeout_msg
-	
-FindPos: 
-	do_lcd_write_str str_findposition_msg
 	
 EXT_INT_R:
 	;;;;HOW TO USE PUSH BUTTONS:
@@ -208,20 +274,23 @@ EXT_INT_R:
 	;reti
 
 EXT_INT_L:
-	;;;;HOW TO USE PUSH BUTTONS:
-	;cpii debounce, 1
-	;brne endInt
-	;clr debounce
-	;;;;DO STUFF HERE
-	;toggle TIMSK2, 1<<TOIE2
-	;endInt:
-	;reti
+	cpii debounce, 1
+	brne endInt
+	clr debounce
+	;check screenstage 'switch statement'
+	cpii screenStage, stage_start ;check if on start screen
+	brne checkStageWin
+	ldii screenStage, stage_countdown
+	rjmp preEndInt
+	checkStageWin:
+	cpii screenStage, stage_win
+	brne preEndInt
+	ldii screenStage, stage_start
+	preEndInt:
+	toggle TIMSK2, 1<<TOIE2
+	endInt:
+	reti
 
-countdownfunc:
-	ldi countdown, 3 
-	do_lcd_write_str str_countdown_msg
-	toggle TIMSK0, 1<<TOIE0
-	ret
 
 ;;;;;;;LEAVE THIS HERE - NEEDS TO BE INCLUDED LAST!!!;;;;;;;
 .include "LCD.asm"
