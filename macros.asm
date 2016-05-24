@@ -1,3 +1,18 @@
+;Clear word of data memory
+.macro clear_datamem
+	push temp
+	push yl
+	push yh
+    ldi yl, low(@0)
+    ldi yh, high(@0)
+    clr temp
+    st y+, temp
+    st y, temp
+	pop yh
+	pop yl
+	pop temp
+.endmacro
+
 ;Does LCD Command
 .macro do_lcd_command
 	ldi r16, @0

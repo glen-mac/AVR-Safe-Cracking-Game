@@ -36,7 +36,8 @@
 ;;;;;;;;;;;;REGISTER DEFINES;;;;;;;;;;;;
 .def debounce = r2  	; debounce flag boolean for push buttons
 .def screenStage = r3	; current stage the game is on
-.def counter = r4		; a countdown variable
+.def screenStageFol	= r4; a backlog of screenstage
+.def counter = r5		; a countdown variable
 .def row = r16 			; current row number
 .def col = r17 			; current column number
 .def rmask = r18 		; mask for current row during scan
@@ -48,7 +49,6 @@
 counterTimer: .byte 2
 
 .cseg
-.org 0x0000
 	jmp RESET
 ;.org 0x0002
 	jmp EXT_INT_R	;right push button
@@ -64,7 +64,7 @@ counterTimer: .byte 2
 	jmp Timer3OVF	;keypad search code
 ;STRING LIST:  (1 denotes a new line, 0 denotes end of second line)
 str_home_msg: .db "2121 16s1", 1, "Safe Cracker", 0
-str_findposition_msg: .db "Find POT POS", 1, "Remaining:", 0
+str_findposition_msg: .db "Find POT POS", 1, "Remaining: ", 0
 str_timeout_msg: .db "Game over", 1, "You Lose!", 0 
 str_reset_msg: .db "Reset POT to 0", 1, "Remaining ", 0
 str_countdown_msg: .db "2121 16s1", 1, "Starting in ", 0
@@ -129,7 +129,10 @@ RESET:
 	clr r23
 	clr r22
 	clr screenStage		; initial screen (click left button to start)
+	clr counter
 	ldii debounce, 1
+
+	clear_datamem counterTimer
 
 	do_lcd_write_str str_home_msg ;write home message to screen
 
@@ -170,13 +173,19 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	breq loseSeg
 
 	rjmp endTimer0
-
+	
 	countdownSeg:
-
-	do_lcd_write_str str_countdown_msg
+	rcall countdownFunc
 	rjmp endTimer0
 
 	potResetSeg:
+	cpii screenStageFol, stage_pot_reset
+	breq endpotResetSeg
+	do_lcd_write_str str_findposition_msg
+	ldi temp, 20
+	rcall asciiconv
+	ldii screenStageFol, stage_pot_reset
+	endpotResetSeg:
 	rjmp endTimer0
 
 	potFindSeg:
@@ -192,9 +201,12 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	rjmp endTimer0
 
 	loseSeg:
+	toggle TIMSK1, 0
+	toggle TIMSK0,0
+	do_lcd_write_str str_timeout_msg
 	rjmp endTimer0
 
-	countdownfunc:
+;	countdownfunc:
 ;		ldi countdown, 3 
 ;		do_lcd_write_str str_countdown_msg
 ;		toggle TIMSK0, 1<<TOIE0
@@ -215,32 +227,87 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	reti
 
 
+countdownFunc:
+	cpii screenStageFol, stage_countdown
+	breq endcountdownSeg
+	do_lcd_write_str str_countdown_msg
+	ldi temp, 3
+	addi temp, '0'
+	do_lcd_data temp
+	do_lcd_data_i '.'
+	do_lcd_data_i '.'
+	do_lcd_data_i '.'
+	toggle TIMSK1, 1<<TOIE1
+	ldii screenStageFol, stage_countdown
+	endcountdownSeg:
+	ret
+
+
 Timer1OVF: ;This is a countdown timer
-	push r19
-	push r20 
+	push yl
+	push yh
+	push temp
+	lds yl, counterTimer
+	lds yh, counterTimer+1
+	adiw Y, 1
+	sts counterTimer, yl
+    sts counterTimer+1, yh
+	ldi temp, high(30)
+	cpi yl, low(30)
+	cpc yh, temp
+	breq runTimer1
+	rjmp endTimer1		; fix for out of range branch
+	runTimer1:
+
+	inc counter
+	clear_datamem counterTimer
+
 	cpii screenStage, stage_countdown
 	breq countInitialCount
 	cpii screenStage, stage_pot_reset
-	breq countPotFind
+	breq countPotReset
 	rjmp endTimer1
-
 
 	countInitialCount:
+	ldi temp, counter_initial
+	sub temp, counter
+	cpi temp, 0
+	brne contInitialCount
+	ldii screenStage, stage_pot_reset		; change to POT reset screen
+	clr counter								; clear counter ready for POT reset screen
+	rjmp endTimer1
+	contInitialCount:
+	addi temp, '0'
+	do_lcd_write_str str_countdown_msg
+	do_lcd_data temp
+	do_lcd_data_i '.'
+	do_lcd_data_i '.'
+	do_lcd_data_i '.'
 	rjmp endTimer1
 
-	countPotFind:
+	countPotReset:
+	ldi temp, 20
+	sub temp, counter
+	cpi temp, 0
+	brne contPotReset
+	ldii screenStage, stage_lose			; change to POT timeout
 	rjmp endTimer1
+	contPotReset:
 
+	do_lcd_write_str str_findposition_msg
+
+	rcall asciiconv
+	rjmp endTimer1
 	endTimer1:
-	pop r20
-	pop r19
+	pop temp
+	pop yh
+	pop yl
 	reti
 
 
 Timer2OVF:  ;the timer for push button debouncing
 	push temp
 	adiw r24:r25, 1
-
 	ldi temp, high(debDELAY)
 	cpi r24, low(debDELAY)
 	cpc r25, temp
@@ -357,8 +424,6 @@ EXT_INT_R:
 	reti
 
 EXT_INT_L:
-	com temp
-	out PORTC, temp
 	cpii debounce, 1
 	brne endIntL
 	clr debounce
@@ -375,6 +440,42 @@ EXT_INT_L:
 	toggle TIMSK2, 1<<TOIE2
 	endIntL:
 	reti
+
+asciiconv:
+	push r17
+	push r18
+	push r19
+	push temp
+	clr r18
+	clr r19
+	clr r17
+	numhundreds:
+	cpi temp, 100
+	brlo numtens ;branch if lower due to unsigned
+	inc r17
+	subi temp, 100
+	rjmp numhundreds
+	numtens:
+	cpi temp, 10
+	brlo numones ;branch if lower due to unsigned
+	inc r19
+	subi temp, 10
+	rjmp numtens
+	numones:
+	mov r18, temp
+	ldi temp, '0'
+	addi r17, '0'
+	cpse r17, temp
+	do_lcd_data r17
+	addi r19, '0'
+	do_lcd_data r19
+	addi r18, '0'
+	do_lcd_data r18
+	pop temp
+	pop r19
+	pop r18
+	pop r17
+	ret
 
 ;;;;;;;LEAVE THIS HERE - NEEDS TO BE INCLUDED LAST!!!;;;;;;;
 .include "LCD.asm"
