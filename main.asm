@@ -1,6 +1,4 @@
 ;;;;;;;;;;;;; TO DO ;;;;;;;;
-;;A countdown Macro is needed because 
-;;it will clear the screen then display the new time. 
 ;;
 ;;Do Pot code
 ;
@@ -9,7 +7,6 @@
 ;;Put keypad code in Timer0, with 0 prescaler (can disable with toggle macro)
 ;;when not needed)
 ;;
-;;Scale game loop to 1ms (Tiemr 0)
 ;
 ;;Set TIMER 3 to 8 bit 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -131,11 +128,8 @@ RESET:
 	clr screenStage		; initial screen (click left button to start)
 	clr counter
 	ldii debounce, 1
-
 	clear_datamem counterTimer
-
 	do_lcd_write_str str_home_msg ;write home message to screen
-
 	sei
 	
 halt:
@@ -243,7 +237,7 @@ countdownFunc:
 	ret
 
 
-Timer1OVF: ;This is a countdown timer
+Timer1OVF: ;This is a countdown timer (16-bit)
 	push yl
 	push yh
 	push temp
