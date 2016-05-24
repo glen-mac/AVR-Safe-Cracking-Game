@@ -41,17 +41,19 @@
 .def temp = r20
 .def temp2 = r21
 
-
 .cseg
-jmp RESET
-jmp EXT_INT_R	;right push button
-jmp EXT_INT_L	;left push button
+.org 0x0000
+	jmp RESET
+.org 0x0002
+	jmp EXT_INT_R	;right push button
+.org 0x0004
+	jmp EXT_INT_L	;left push button
 .org OVF0addr
-jmp Timer0OVF	;game loop
+	jmp Timer0OVF	;game loop
 .org OVF2addr
-jmp Timer2OVF	;debounce timer for push buttons
-.org OVF1addr
-jmp Timer1OVF	;keypad search code
+	jmp Timer2OVF	;debounce timer for push buttons
+.org OVF3addr
+	jmp Timer3OVF	;keypad search code
 ;STRING LIST:  (1 denotes a new line, 0 denotes end of second line)
 str_home_msg: .db "2121 16s1", 1, "Safe Cracker", 0
 str_findposition_msg: .db "Find POT POS", 1, "Remaining:", 0
@@ -59,6 +61,8 @@ str_timeout_msg: .db "Game over", 1, "You Lose!", 0
 str_reset_msg: .db "Reset POT to 0", 1, "Remaining ", 0
 str_countdown_msg: .db "Starting in ", 1, 0
 	
+
+
 RESET:
 	;;;;;;;;prepare stack;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	ldi temp, low(RAMEND) ; initialize the stack
@@ -67,8 +71,8 @@ RESET:
 	out SPH, temp
   	;;;;;;;;prepare LCD;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	ser r16
-	out DDRF, r16
-	out DDRA, r16
+	out DDRF, r16 ;LCD?
+	out DDRA, r16 
 	clr r16
 	out PORTF, r16
 	out PORTA, r16
@@ -136,20 +140,20 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	rjmp endTimer0
 
 	countdownfunc:
-		ldi countdown, 3 
-		do_lcd_write_str str_countdown_msg
-		toggle TIMSK0, 1<<TOIE0
-		ret
+;		ldi countdown, 3 
+;		do_lcd_write_str str_countdown_msg
+;		toggle TIMSK0, 1<<TOIE0
+		;ret
 
 	ResetPot:
-		do_lcd_write_str str_reset_msg
-		do_lcd_data countdown
+;		do_lcd_write_str str_reset_msg
+;		do_lcd_data countdown
 
 	Timeout: 
-		do_lcd_write_str str_timeout_msg
+;		do_lcd_write_str str_timeout_msg
 	
 	FindPos: 
-		do_lcd_write_str str_findposition_msg
+;		do_lcd_write_str str_findposition_msg
 
 	endTimer0:
 	reti
@@ -157,10 +161,10 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 
 Timer2OVF:  ;the timer for push button debouncing
 	push temp
-	adiw debtimerlo, 1
+;	adiw debtimerlo, 1
 	ldi temp, high(debDELAY)
-	cpi debtimerlo, low(debDELAY)
-	cpc debtimerhi, temp
+;	cpi debtimerlo, low(debDELAY)
+;;	cpc debtimerhi, temp
 	brne enddeb
 	ldii debounce, 1
 	toggle TIMSK2, 0
@@ -226,7 +230,7 @@ symbols:
 	breq star ;star
 	cpi col, 1 ; or if we have zero
 	breq zero
-	rjmp main
+	rjmp endTimer3
 star:
 	rjmp RESET
 zero:
@@ -236,20 +240,20 @@ letters:
 	A:
 	cpi row, 0 ;A
 	brne B
-	ldi countdown, 20
+;	ldi countdown, 20
 	rjmp ResetPot
 	B:
 	cpi row, 1 ;B
 	brne C
-	ldi countdown, 15
+;	ldi countdown, 15
 	rjmp ResetPot
 	C:
 	cpi row, 2 ;C
 	brne D
-	ldi countdown 10
+;	ldi countdown, 10
 	rjmp ResetPot
 	D:						
-	ldi countdown, 6
+;	ldi countdown, 6
 	rjmp ResetPot
 convert_end:
 	rjmp endTimer3
@@ -261,8 +265,6 @@ endTimer3:
 	pop col
 	reti
 
-
-	
 EXT_INT_R:
 	;;;;HOW TO USE PUSH BUTTONS:
 	;cpii debounce, 1
@@ -290,7 +292,6 @@ EXT_INT_L:
 	toggle TIMSK2, 1<<TOIE2
 	endInt:
 	reti
-
 
 ;;;;;;;LEAVE THIS HERE - NEEDS TO BE INCLUDED LAST!!!;;;;;;;
 .include "LCD.asm"
