@@ -35,6 +35,7 @@
 	push r17
 	push zl
 	push zh
+	do_lcd_clear
 	ldi zl, low(@0<<1)
 	ldi zh, high(@0<<1)
 	writeLoop:

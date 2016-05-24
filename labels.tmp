@@ -21,54 +21,60 @@
   <FILE>C:\Users\glenn\Desktop\COMP2121-16s1\Ass1.map</FILE>
  </OUTPUT_FILES>
  <LABELS>
-  <RESET><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>66</LINE></RESET>
-  <EXT_INT_R><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>268</LINE></EXT_INT_R>
-  <EXT_INT_L><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>278</LINE></EXT_INT_L>
-  <Timer0OVF><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>105</LINE></Timer0OVF>
-  <Timer2OVF><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>162</LINE></Timer2OVF>
-  <Timer3OVF><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>175</LINE></Timer3OVF>
-  <str_home_msg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>58</LINE></str_home_msg>
-  <str_findposition_msg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>59</LINE></str_findposition_msg>
-  <str_timeout_msg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>60</LINE></str_timeout_msg>
-  <str_reset_msg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>61</LINE></str_reset_msg>
-  <str_countdown_msg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>62</LINE></str_countdown_msg>
+  <counterTimer><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>48</LINE></counterTimer>
+  <RESET><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>72</LINE></RESET>
+  <EXT_INT_R><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>348</LINE></EXT_INT_R>
+  <EXT_INT_L><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>358</LINE></EXT_INT_L>
+  <Timer0OVF><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>142</LINE></Timer0OVF>
+  <Timer1OVF><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>218</LINE></Timer1OVF>
+  <Timer2OVF><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>239</LINE></Timer2OVF>
+  <Timer3OVF><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>255</LINE></Timer3OVF>
+  <str_home_msg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>66</LINE></str_home_msg>
+  <str_findposition_msg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>67</LINE></str_findposition_msg>
+  <str_timeout_msg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>68</LINE></str_timeout_msg>
+  <str_reset_msg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>69</LINE></str_reset_msg>
+  <str_countdown_msg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>70</LINE></str_countdown_msg>
   <lcd_command><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\LCD.asm</FILE><LINE>24</LINE></lcd_command>
   <lcd_wait><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\LCD.asm</FILE><LINE>44</LINE></lcd_wait>
   <sleep_5ms><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\LCD.asm</FILE><LINE>81</LINE></sleep_5ms>
   <sleep_1ms><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\LCD.asm</FILE><LINE>69</LINE></sleep_1ms>
   <lcd_data><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\LCD.asm</FILE><LINE>33</LINE></lcd_data>
-  <halt><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>101</LINE></halt>
-  <countdownSeg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>121</LINE></countdownSeg>
-  <potResetSeg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>124</LINE></potResetSeg>
-  <potFindSeg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>127</LINE></potFindSeg>
-  <codeFindSeg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>130</LINE></codeFindSeg>
-  <codeEnterSeg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>133</LINE></codeEnterSeg>
-  <winSeg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>136</LINE></winSeg>
-  <loseSeg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>139</LINE></loseSeg>
-  <endTimer0><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>158</LINE></endTimer0>
-  <countdownfunc><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>142</LINE></countdownfunc>
-  <ResetPot><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>148</LINE></ResetPot>
-  <Timeout><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>152</LINE></Timeout>
-  <FindPos><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>155</LINE></FindPos>
-  <enddeb><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>171</LINE></enddeb>
-  <colloop><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>189</LINE></colloop>
-  <endTimer3><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>260</LINE></endTimer3>
-  <delay><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>194</LINE></delay>
-  <nextcol><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>212</LINE></nextcol>
-  <rowloop><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>203</LINE></rowloop>
-  <convert><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>216</LINE></convert>
-  <letters><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>239</LINE></letters>
-  <symbols><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>228</LINE></symbols>
-  <convert_end><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>258</LINE></convert_end>
-  <star><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>234</LINE></star>
-  <zero><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>236</LINE></zero>
-  <A><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>240</LINE></A>
-  <B><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>245</LINE></B>
-  <C><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>250</LINE></C>
-  <D><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>255</LINE></D>
-  <endInt><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>293</LINE></endInt>
-  <checkStageWin><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>287</LINE></checkStageWin>
-  <preEndInt><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>291</LINE></preEndInt>
+  <halt><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>138</LINE></halt>
+  <contTimer0><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>153</LINE></contTimer0>
+  <countdownSeg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>174</LINE></countdownSeg>
+  <potResetSeg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>179</LINE></potResetSeg>
+  <potFindSeg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>182</LINE></potFindSeg>
+  <codeFindSeg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>185</LINE></codeFindSeg>
+  <codeEnterSeg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>188</LINE></codeEnterSeg>
+  <winSeg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>191</LINE></winSeg>
+  <loseSeg><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>194</LINE></loseSeg>
+  <endTimer0><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>213</LINE></endTimer0>
+  <countdownfunc><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>197</LINE></countdownfunc>
+  <ResetPot><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>203</LINE></ResetPot>
+  <Timeout><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>207</LINE></Timeout>
+  <FindPos><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>210</LINE></FindPos>
+  <countInitialCount><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>229</LINE></countInitialCount>
+  <countPotFind><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>232</LINE></countPotFind>
+  <endTimer1><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>235</LINE></endTimer1>
+  <endTimer2><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>251</LINE></endTimer2>
+  <colloop><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>269</LINE></colloop>
+  <endTimer3><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>340</LINE></endTimer3>
+  <delay><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>274</LINE></delay>
+  <nextcol><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>292</LINE></nextcol>
+  <rowloop><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>283</LINE></rowloop>
+  <convert><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>296</LINE></convert>
+  <letters><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>319</LINE></letters>
+  <symbols><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>308</LINE></symbols>
+  <convert_end><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>338</LINE></convert_end>
+  <star><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>314</LINE></star>
+  <zero><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>316</LINE></zero>
+  <A><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>320</LINE></A>
+  <B><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>325</LINE></B>
+  <C><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>330</LINE></C>
+  <D><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>335</LINE></D>
+  <endIntL><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>375</LINE></endIntL>
+  <checkStageWin><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>369</LINE></checkStageWin>
+  <preEndInt><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\main.asm</FILE><LINE>373</LINE></preEndInt>
   <lcd_wait_loop><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\LCD.asm</FILE><LINE>51</LINE></lcd_wait_loop>
   <delayloop_1ms><FILE>C:\Users\glenn\Desktop\COMP2121-16s1\LCD.asm</FILE><LINE>74</LINE></delayloop_1ms>
  </LABELS>
