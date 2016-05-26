@@ -154,9 +154,9 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	clr r22
 	clr r23
 
-	ADMUX = (3 << REFS0) | (0 << ADLAR) | (0 << MUX0);
-	ADCSRB = (1 << MUX5);
-	ADCSRA = (1 << ADEN) | (1 << ADSC) | (1 << ADIE) | (5 << ADPS0);
+;	ADMUX = (3 << REFS0) | (0 << ADLAR) | (0 << MUX0);
+;	ADCSRB = (1 << MUX5);
+;	ADCSRA = (1 << ADEN) | (1 << ADSC) | (1 << ADIE) | (5 << ADPS0);
 
 	cpii screenStage, stage_countdown
 	breq countdownSeg

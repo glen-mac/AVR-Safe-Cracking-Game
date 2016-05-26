@@ -1,5 +1,5 @@
 
-AVRASM ver. 2.1.42  C:\Users\glenn\Desktop\COMP2121-16s1\main.asm Wed May 25 01:20:42 2016
+AVRASM ver. 2.1.42  C:\Users\glenn\Desktop\COMP2121-16s1\main.asm Fri May 27 04:55:10 2016
 
 
 EQU  SIGNATURE_000 0000001e
@@ -1401,11 +1401,11 @@ CSEG lcd_command  000002f0
 CSEG lcd_wait     00000300
 CSEG sleep_5ms    0000031a
 CSEG sleep_1ms    00000311
-CSEG writeLoop@do_lcd_write_str@2138 000000ec
-CSEG endLineCheck@do_lcd_write_str@2138 000000f3
-CSEG redoLoop@do_lcd_write_str@2138 000000f6
+CSEG writeLoop@do_lcd_write_str@2141 000000ec
+CSEG endLineCheck@do_lcd_write_str@2141 000000f3
+CSEG redoLoop@do_lcd_write_str@2141 000000f6
 CSEG lcd_data     000002f7
-CSEG endWrite@do_lcd_write_str@2138 000000fa
+CSEG endWrite@do_lcd_write_str@2141 000000fa
 CSEG halt         000000fe
 CSEG contTimer0   0000010c
 CSEG countdownSeg 00000132
@@ -1418,37 +1418,37 @@ CSEG loseSeg      0000015d
 CSEG endTimer0    00000181
 CSEG countdownFunc 00000183
 CSEG endpotResetSeg 00000158
-CSEG writeLoop@do_lcd_write_str@2284 00000141
-CSEG endLineCheck@do_lcd_write_str@2284 00000148
-CSEG redoLoop@do_lcd_write_str@2284 0000014b
-CSEG endWrite@do_lcd_write_str@2284 0000014f
+CSEG writeLoop@do_lcd_write_str@2291 00000141
+CSEG endLineCheck@do_lcd_write_str@2291 00000148
+CSEG redoLoop@do_lcd_write_str@2291 0000014b
+CSEG endWrite@do_lcd_write_str@2291 0000014f
 CSEG asciiconv    000002c2
-CSEG writeLoop@do_lcd_write_str@2370 0000016f
-CSEG endLineCheck@do_lcd_write_str@2370 00000176
-CSEG redoLoop@do_lcd_write_str@2370 00000179
-CSEG endWrite@do_lcd_write_str@2370 0000017d
+CSEG writeLoop@do_lcd_write_str@2377 0000016f
+CSEG endLineCheck@do_lcd_write_str@2377 00000176
+CSEG redoLoop@do_lcd_write_str@2377 00000179
+CSEG endWrite@do_lcd_write_str@2377 0000017d
 CSEG ResetPot     00000181
 CSEG Timeout      00000181
 CSEG FindPos      00000181
 CSEG endcountdownSeg 000001be
-CSEG writeLoop@do_lcd_write_str@2449 00000190
-CSEG endLineCheck@do_lcd_write_str@2449 00000197
-CSEG redoLoop@do_lcd_write_str@2449 0000019a
-CSEG endWrite@do_lcd_write_str@2449 0000019e
+CSEG writeLoop@do_lcd_write_str@2456 00000190
+CSEG endLineCheck@do_lcd_write_str@2456 00000197
+CSEG redoLoop@do_lcd_write_str@2456 0000019a
+CSEG endWrite@do_lcd_write_str@2456 0000019e
 CSEG runTimer1    000001d0
 CSEG endTimer1    00000242
 CSEG countInitialCount 000001e7
 CSEG countPotReset 0000021e
 CSEG contInitialCount 000001f1
-CSEG writeLoop@do_lcd_write_str@2630 000001fd
-CSEG endLineCheck@do_lcd_write_str@2630 00000204
-CSEG redoLoop@do_lcd_write_str@2630 00000207
-CSEG endWrite@do_lcd_write_str@2630 0000020b
+CSEG writeLoop@do_lcd_write_str@2637 000001fd
+CSEG endLineCheck@do_lcd_write_str@2637 00000204
+CSEG redoLoop@do_lcd_write_str@2637 00000207
+CSEG endWrite@do_lcd_write_str@2637 0000020b
 CSEG contPotReset 00000227
-CSEG writeLoop@do_lcd_write_str@2730 0000022f
-CSEG endLineCheck@do_lcd_write_str@2730 00000236
-CSEG redoLoop@do_lcd_write_str@2730 00000239
-CSEG endWrite@do_lcd_write_str@2730 0000023d
+CSEG writeLoop@do_lcd_write_str@2737 0000022f
+CSEG endLineCheck@do_lcd_write_str@2737 00000236
+CSEG redoLoop@do_lcd_write_str@2737 00000239
+CSEG endWrite@do_lcd_write_str@2737 0000023d
 CSEG endTimer2    00000257
 CSEG colloop      00000263
 CSEG endTimer3    0000029c
