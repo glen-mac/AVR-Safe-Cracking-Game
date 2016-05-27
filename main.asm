@@ -36,7 +36,7 @@
 ;;;;;;;;;;;;REGISTER DEFINES;;;;;;;;;;;;
 .def debounce = r2  	; debounce flag boolean for push buttons
 .def screenStage = r3	; current stage the game is on
-.def screenStageFol	= r4; a backlog of screenstage
+.def screenStageFol = r4; a backlog of screenstage
 .def counter = r5		; a countdown variable
 .def row = r16 			; current row number
 .def col = r17 			; current column number
@@ -93,7 +93,7 @@ RESET:
 	do_lcd_command 0b00000110 ; increment, no display shift
 	do_lcd_command 0b00001110 ; Cursor on, bar, no blink
 	;;;;;;;;prepare EXTERNAL INTERRUPTS;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ldi temp, (2 << ISC00)	;set INT0 
+	ldi temp, (2 << ISC00)	;set INT0 
 	ldi temp, (2 << ISC10)	;and INT1
 	sts EICRA, temp			;as falling edge
 	in temp, EIMSK
@@ -200,7 +200,27 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 
 	winSeg:
 	rjmp endTimer0
-
+	;	Timer:
+;	in temp, SREG
+;	push temp 
+;	push r25
+;	push r24 
+;	adiw r25:r24, 1
+;	cpi r24, low(3906) 
+;	ldi temp, high(3906)
+;	cpc r25, temp
+;	brne endif
+;	
+;	com flash
+;	out PORTC, patlo
+;	clr r24
+;	clr r25
+;	endif:
+;	pop r24 
+;	pop r25 
+;;	pop temp
+;	out SREG, temp
+;	reti 
 	loseSeg:
 	toggle TIMSK1, 0
 	toggle TIMSK0,0
@@ -372,20 +392,24 @@ convert:
 	lsl temp
 	add temp, row
 	add temp, col ; temp = row*3 + col
-	inc temp
-	jmp convert_end
+	subi temp, -'1'
+	rjmp comparecode
 symbols:
 	cpi col, 0 ; Check if we have a star
 	breq star ;star
 	cpi col, 1 ; or if we have zero
 	breq zero
-	rjmp endTimer3
+	ldi temp, '#'
+	rjmp comparecode
 star:
-	rjmp RESET
+	ldi temp, '*'	;need to display this key too
+	rjmp comparecode
 zero:
 	ldi temp, 0; Set to zero
-	rjmp convert_end
+	rjmp comparecode
 letters:	
+	cpi screenStage, stagestart
+	brne entercode
 	A:
 	cpi row, 0 ;A
 	brne B
@@ -403,9 +427,21 @@ letters:
 	rjmp ResetPot
 	D:						
 ;	ldi countdown, 6
-	rjmp ResetPot
-convert_end:
-	rjmp endTimer3
+	rjmp ResetPot	
+
+	entercode:	;if not for difficulty
+	ldi temp, 'A'
+	add temp, row
+comparecode: 		;compare the letter pressed, if it is equal to the sequential letter of the next sequence proceed with the code 
+	ldi ZL, LOW(randomcode)
+	ldi ZH, HIGH(randomcode)
+	lpm temp1, Z+
+	cpse temp1, temp
+	rjmp reenter
+	ldi temp, '*'			
+	do_lcd_data  ; temp
+	toggleDebounce 1<<TOIE3
+	ldi debflag, 1
 endTimer3:
 	pop temp
 	pop cmask
@@ -413,7 +449,10 @@ endTimer3:
 	pop row
 	pop col
 	reti
-
+reenter:
+	clr temp 				;to reset if user enters wrong code
+	clr 
+	rjmp endTimer3:
 EXT_INT_R:
 	;;;;HOW TO USE PUSH BUTTONS:
 	;cpii debounce, 1
@@ -442,41 +481,41 @@ EXT_INT_L:
 	endIntL:
 	reti
 
-asciiconv:
-	push r17
-	push r18
-	push r19
-	push temp
-	clr r18
-	clr r19
-	clr r17
-	numhundreds:
-	cpi temp, 100
-	brlo numtens ;branch if lower due to unsigned
-	inc r17
-	subi temp, 100
-	rjmp numhundreds
-	numtens:
-	cpi temp, 10
-	brlo numones ;branch if lower due to unsigned
-	inc r19
-	subi temp, 10
-	rjmp numtens
-	numones:
-	mov r18, temp
-	ldi temp, '0'
-	addi r17, '0'
-	cpse r17, temp
-	do_lcd_data r17
-	addi r19, '0'
-	do_lcd_data r19
-	addi r18, '0'
-	do_lcd_data r18
-	pop temp
-	pop r19
-	pop r18
-	pop r17
-	ret
-
+asciiconv:				;no need for ascii convert as digits show up as '*'
+;	push r17
+;	push r18
+;	push r19
+;	push temp
+;	clr r18
+;	clr r19
+;;	clr r17
+;	numhundreds:
+;	cpi temp, 100
+;	brlo numtens ;branch if lower due to unsigned
+;	inc r17
+;	subi temp, 100
+;	rjmp numhundreds
+;	numtens:
+;	cpi temp, 10
+;	brlo numones ;branch if lower due to unsigned
+;	inc r19
+;	subi temp, 10
+;	rjmp numtens
+;;	numones:
+;	mov r18, temp
+;	ldi temp, '0'
+;	addi r17, '0'
+;	cpse r17, temp
+;	do_lcd_data r17
+;	addi r19, '0'
+;	do_lcd_data r19
+;	addi r18, '0'
+;	do_lcd_data r18
+;;	pop temp
+;	pop r19
+;	pop r18
+;	pop r17
+;	ret
+;
 ;;;;;;;LEAVE THIS HERE - NEEDS TO BE INCLUDED LAST!!!;;;;;;;
 .include "LCD.asm"
