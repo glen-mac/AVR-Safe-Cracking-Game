@@ -44,6 +44,7 @@
 .def cmask = r19		; mask for current column during scan
 .def temp = r20			; temp variable
 .def temp2 = r21		; temp variable
+.def flash = r23
 
 .dseg
 counterTimer: .byte 2
@@ -199,8 +200,31 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	rjmp endTimer0
 
 	winSeg:
-	rjmp endTimer0
+	
+;	Timer:
+;	in temp, SREG
+;	push temp 
+;	push r25
+;	push r24 
+;	adiw r25:r24, 1
+;	cpi r24, low(3906) 
+;	ldi temp, high(3906)
+;	cpc r25, temp
+;	brne endif
+;	
+;	com flash
+;	out PORTC, patlo
+;	clr r24
+;	clr r25
+;	endif:
+;	pop r24 
+;	pop r25 
+;;	pop temp
+;	out SREG, temp
+;	reti 
 
+	rjmp endTimer0
+	
 	loseSeg:
 	toggle TIMSK1, 0
 	toggle TIMSK0,0
@@ -262,12 +286,13 @@ Timer1OVF: ;This is a countdown timer
 
 	inc counter
 	clear_datamem counterTimer
-
 	cpii screenStage, stage_countdown
 	breq countInitialCount
 	cpii screenStage, stage_pot_reset
 	breq countPotReset
 	rjmp endTimer1
+
+
 
 	countInitialCount:
 	ldi temp, counter_initial
