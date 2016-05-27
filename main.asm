@@ -47,6 +47,7 @@
 
 .dseg
 counterTimer: .byte 2
+randomcode: .byte 2
 
 .cseg
 	jmp RESET
@@ -357,7 +358,9 @@ Timer3OVF: ;keypad loop
 	clr temp
 colloop:
 	cpi col, 4
-	breq endTimer3	; If all keys are scanned, repeat.
+	brne contColloop; If all keys are scanned, repeat.
+ 	jmp endTimer3
+	contColloop:
 	sts PORTL, cmask; Otherwise, scan a column.
 	ldi temp, 0xFF	; Slow down the scan operation.
 delay:
@@ -408,7 +411,7 @@ zero:
 	ldi temp, 0; Set to zero
 	rjmp comparecode
 letters:	
-	cpi screenStage, stagestart
+	cpii screenStage, stage_start
 	brne entercode
 	A:
 	cpi row, 0 ;A
@@ -433,15 +436,19 @@ letters:
 	ldi temp, 'A'
 	add temp, row
 comparecode: 		;compare the letter pressed, if it is equal to the sequential letter of the next sequence proceed with the code 
-	ldi ZL, LOW(randomcode)
-	ldi ZH, HIGH(randomcode)
-	lpm temp1, Z+
-	cpse temp1, temp
+;	lds yl, counterTimer
+	;lds yh, counterTimer+1
+	
+	
+	;ldi ZL, LOW(randomcode)
+	;ldi ZH, HIGH(randomcode)
+	lpm temp2, Z+
+	cpse temp2, temp
 	rjmp reenter
 	ldi temp, '*'			
-	do_lcd_data  ; temp
-	toggleDebounce 1<<TOIE3
-	ldi debflag, 1
+	do_lcd_data temp
+	toggle TIMSK3, 1<<TOIE3
+	ldii debounce, 1
 endTimer3:
 	pop temp
 	pop cmask
@@ -451,8 +458,9 @@ endTimer3:
 	reti
 reenter:
 	clr temp 				;to reset if user enters wrong code
-	clr 
-	rjmp endTimer3:
+	;clr 
+	rjmp endTimer3
+	
 EXT_INT_R:
 	;;;;HOW TO USE PUSH BUTTONS:
 	;cpii debounce, 1
