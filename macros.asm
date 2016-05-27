@@ -103,3 +103,15 @@
 	add @0, r16
 	pop r16
 .endmacro
+
+
+.macro createADCint
+	push temp
+	ldi temp, (1 << REFS0) | (0 << ADLAR) | (0 << MUX0);     Set ADC reference to AVCC
+	sts ADMUX, temp
+	ldi temp, (1 << MUX5); 
+	sts ADCSRB, temp
+	ldi temp, (1 << ADEN) | (1 << ADSC) | (1 << ADIE) | (5 << ADPS0)   
+	sts ADCSRA, temp
+	pop temp
+.endmacro

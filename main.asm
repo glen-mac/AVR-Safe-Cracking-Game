@@ -50,10 +50,11 @@ counterTimer: .byte 2
 randomcode: .byte 2
 
 .cseg
+;.org 0x0
 	jmp RESET
-;.org 0x0002
+;.org 0x2
 	jmp EXT_INT_R	;right push button
-;.org 0x0004
+;.org 0x4
 	jmp EXT_INT_L	;left push button
 .org OVF0addr
 	jmp Timer0OVF	;game loop
@@ -63,6 +64,10 @@ randomcode: .byte 2
 	jmp Timer2OVF	;debounce timer for push buttons
 .org OVF3addr
 	jmp Timer3OVF	;keypad search code
+.org 0x3A
+	jmp handleADC
+
+.org 0x50
 ;STRING LIST:  (1 denotes a new line, 0 denotes end of second line)
 str_home_msg: .db "2121 16s1", 1, "Safe Cracker", 0
 str_findposition_msg: .db "Find POT POS", 1, "Remaining: ", 0
@@ -121,10 +126,16 @@ RESET:
 	;;;;;;;;prepare MISC;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   	ldi temp, PORTLDIR ; PA7:4/PA3:0, out/in
 	sts DDRL, temp
-	ser temp
+	
+	ldi temp, 0xFF
 	out DDRC, temp	;PORTC is for LED bar
+	out DDRG, temp
+	
+
 	clr temp
 	out PORTC, temp ;BLANK the LED bar
+
+
 	clr r24
 	clr r25
 	clr r23
@@ -132,6 +143,7 @@ RESET:
 	clr screenStage		; initial screen (click left button to start)
 	clr counter
 	ldii debounce, 1
+
 	clear_datamem counterTimer
 	do_lcd_write_str str_home_msg ;write home message to screen
 	sei
@@ -155,9 +167,7 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	clr r22
 	clr r23
 
-;	ADMUX = (3 << REFS0) | (0 << ADLAR) | (0 << MUX0);
-;	ADCSRB = (1 << MUX5);
-;	ADCSRA = (1 << ADEN) | (1 << ADSC) | (1 << ADIE) | (5 << ADPS0);
+createADCint
 
 	cpii screenStage, stage_countdown
 	breq countdownSeg
@@ -188,6 +198,7 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	rcall asciiconv
 	ldii screenStageFol, stage_pot_reset
 	endpotResetSeg:
+	;createADCint ;create interrupt vector
 	rjmp endTimer0
 
 	potFindSeg:
@@ -227,22 +238,6 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	toggle TIMSK0,0
 	do_lcd_write_str str_timeout_msg
 	rjmp endTimer0
-
-;	countdownfunc:
-;		ldi countdown, 3 
-;		do_lcd_write_str str_countdown_msg
-;		toggle TIMSK0, 1<<TOIE0
-		;ret
-
-	ResetPot:
-;		do_lcd_write_str str_reset_msg
-;		do_lcd_data countdown
-
-	Timeout: 
-;		do_lcd_write_str str_timeout_msg
-	
-	FindPos: 
-;		do_lcd_write_str str_findposition_msg
 
 	endTimer0:
 	pop temp
@@ -417,20 +412,20 @@ letters:
 	cpi row, 0 ;A
 	brne B
 ;	ldi countdown, 20
-	rjmp ResetPot
+;	rjmp ResetPot
 	B:
 	cpi row, 1 ;B
 	brne C
 ;	ldi countdown, 15
-	rjmp ResetPot
+;	rjmp ResetPot
 	C:
 	cpi row, 2 ;C
 	brne D
 ;	ldi countdown, 10
-	rjmp ResetPot
+;	rjmp ResetPot
 	D:						
 ;	ldi countdown, 6
-	rjmp ResetPot	
+;	rjmp ResetPot	
 
 	entercode:	;if not for difficulty
 	ldi temp, 'A'
@@ -487,6 +482,25 @@ EXT_INT_L:
 	preEndInt:
 	toggle TIMSK2, 1<<TOIE2
 	endIntL:
+	reti
+
+handleADC:
+	push temp
+	push r20
+
+	lds r20, ADCL 
+	out PORTC, r20
+
+	lds temp, ADCH
+	;ori temp, (0b11)
+	;lsl temp
+	;ldi temp, 0b100
+	out PORTG, temp
+
+
+
+	pop r20
+	pop temp
 	reti
 
 asciiconv:				;no need for ascii convert as digits show up as '*' (we need this for count down)
