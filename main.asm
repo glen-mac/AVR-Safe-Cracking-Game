@@ -12,6 +12,9 @@
 ;;Scale game loop to 1ms (Tiemr 0)
 ;
 ;;Set TIMER 3 to 8 bit 
+;;
+;;Rand # is 11bit mask of a tiemr counter
+;;Keypad selection is lower 4 bit mask of rand #
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 .include "m2560def.inc"
