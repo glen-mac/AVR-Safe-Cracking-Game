@@ -183,7 +183,7 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	potResetSeg:
 	cpii screenStageFol, stage_pot_reset
 	breq endpotResetSeg
-	do_lcd_write_str str_findposition_msg
+	do_lcd_write_str str_reset_msg ;this is the reset pot message?
 	ldi temp, 20
 	rcall asciiconv
 	ldii screenStageFol, stage_pot_reset
@@ -316,7 +316,7 @@ Timer1OVF: ;This is a countdown timer (16-bit)
 	rjmp endTimer1
 	contPotReset:
 
-	do_lcd_write_str str_findposition_msg
+	do_lcd_write_str str_reset_msg
 
 	rcall asciiconv
 	rjmp endTimer1
@@ -489,41 +489,41 @@ EXT_INT_L:
 	endIntL:
 	reti
 
-asciiconv:				;no need for ascii convert as digits show up as '*'
-;	push r17
-;	push r18
-;	push r19
-;	push temp
-;	clr r18
-;	clr r19
-;;	clr r17
-;	numhundreds:
-;	cpi temp, 100
-;	brlo numtens ;branch if lower due to unsigned
-;	inc r17
-;	subi temp, 100
-;	rjmp numhundreds
-;	numtens:
-;	cpi temp, 10
-;	brlo numones ;branch if lower due to unsigned
-;	inc r19
-;	subi temp, 10
-;	rjmp numtens
-;;	numones:
-;	mov r18, temp
-;	ldi temp, '0'
-;	addi r17, '0'
-;	cpse r17, temp
-;	do_lcd_data r17
-;	addi r19, '0'
-;	do_lcd_data r19
-;	addi r18, '0'
-;	do_lcd_data r18
-;;	pop temp
-;	pop r19
-;	pop r18
-;	pop r17
-;	ret
-;
+asciiconv:				;no need for ascii convert as digits show up as '*' (we need this for count down)
+	push r17
+	push r18
+	push r19
+	push temp
+	clr r18
+	clr r19
+	clr r17
+	numhundreds:
+	cpi temp, 100
+	brlo numtens ;branch if lower due to unsigned
+	inc r17
+	subi temp, 100
+	rjmp numhundreds
+	numtens:
+	cpi temp, 10
+	brlo numones ;branch if lower due to unsigned
+	inc r19
+	subi temp, 10
+	rjmp numtens
+	numones:
+	mov r18, temp
+	ldi temp, '0'
+	addi r17, '0'
+	cpse r17, temp
+	do_lcd_data r17
+	addi r19, '0'
+	do_lcd_data r19
+	addi r18, '0'
+	do_lcd_data r18
+	pop temp
+	pop r19
+	pop r18
+	pop r17
+	ret
+
 ;;;;;;;LEAVE THIS HERE - NEEDS TO BE INCLUDED LAST!!!;;;;;;;
 .include "LCD.asm"

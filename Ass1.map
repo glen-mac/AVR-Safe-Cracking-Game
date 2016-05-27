@@ -1,5 +1,5 @@
 
-AVRASM ver. 2.1.42  C:\Users\glenn\Desktop\COMP2121-16s1\main.asm Fri May 27 23:36:43 2016
+AVRASM ver. 2.1.42  C:\Users\glenn\Desktop\COMP2121-16s1\main.asm Fri May 27 23:45:34 2016
 
 
 EQU  SIGNATURE_000 0000001e
@@ -1398,14 +1398,14 @@ CSEG str_findposition_msg 00000054
 CSEG str_timeout_msg 00000061
 CSEG str_reset_msg 0000006b
 CSEG str_countdown_msg 00000078
-CSEG lcd_command  000002dd
-CSEG lcd_wait     000002ed
-CSEG sleep_5ms    00000307
-CSEG sleep_1ms    000002fe
+CSEG lcd_command  0000030b
+CSEG lcd_wait     0000031b
+CSEG sleep_5ms    00000335
+CSEG sleep_1ms    0000032c
 CSEG writeLoop@do_lcd_write_str@2142 000000ec
 CSEG endLineCheck@do_lcd_write_str@2142 000000f3
 CSEG redoLoop@do_lcd_write_str@2142 000000f6
-CSEG lcd_data     000002e4
+CSEG lcd_data     00000312
 CSEG endWrite@do_lcd_write_str@2142 000000fa
 CSEG halt         000000fe
 CSEG contTimer0   0000010c
@@ -1472,11 +1472,14 @@ CSEG reenter      000002bb
 CSEG endIntL      000002dc
 CSEG checkStageWin 000002ce
 CSEG preEndInt    000002d7
+CSEG numhundreds  000002e4
+CSEG numtens      000002e9
+CSEG numones      000002ee
 EQU  LCD_RS       00000007
 EQU  LCD_E        00000006
 EQU  LCD_RW       00000005
 EQU  LCD_BE       00000004
-CSEG lcd_wait_loop 000002f2
+CSEG lcd_wait_loop 00000320
 EQU  F_CPU        00f42400
 EQU  DELAY_1MS    00000f9c
-CSEG delayloop_1ms 00000302
+CSEG delayloop_1ms 00000330
