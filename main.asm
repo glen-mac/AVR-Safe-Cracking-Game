@@ -10,7 +10,7 @@
 ;
 ;;Set TIMER 3 to 8 bit 
 ;;
-;;Rand # is 11bit mask of a tiemr counter
+;;Rand # is 11bit mask of a timer counter
 ;;Keypad selection is lower 4 bit mask of rand #
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
