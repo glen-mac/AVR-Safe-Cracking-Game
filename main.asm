@@ -16,6 +16,7 @@
 
 .include "m2560def.inc"
 .include "macros.asm"
+.include "backlight.asm"
 
 ;;;;;;;;;;;;CONSTANTS;;;;;;;;;;;;;;;;;;;
 .equ debDELAY = 800 	;Variable debounce delay
