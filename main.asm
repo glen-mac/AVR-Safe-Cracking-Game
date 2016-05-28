@@ -38,6 +38,7 @@
 .def screenStage = r3	; current stage the game is on
 .def screenStageFol = r4; a backlog of screenstage
 .def counter = r5		; a countdown variable
+.def backlightstatus = r6
 .def row = r16 			; current row number
 .def col = r17 			; current column number
 .def rmask = r18 		; mask for current row during scan
@@ -48,6 +49,12 @@
 .dseg
 counterTimer: .byte 2
 randomcode: .byte 2
+;;;;;;;;;;;;;;;;;;;;;;BACKLIGHT;;;;;;;;;;;;;;;;;;;;;
+BacklightCounter: .byte 2 						; counts timer overflows
+BacklightSeconds: .byte 1 						; counts number of seconds to trigger backlight fade out
+BacklightFadeCounter: .byte 1 					; used to pace the fade in process
+BacklightFade: .byte 1 							; flag indicating current backlight process - stable/fade in/fade out
+BacklightPWM: .byte 1 							; current backlight brightness
 
 .cseg
 ;.org 0x0
@@ -136,8 +143,9 @@ RESET:
 
 	clr temp
 	out PORTC, temp ;BLANK the LED bar
-
-
+	
+	rcall initialiseBacklightTimer  ;;code for the backlight timer
+	
 	clr r24
 	clr r25
 	clr r23
@@ -272,11 +280,102 @@ Timer1OVF: ;This is a countdown timer (16-bit)
 	adiw Y, 1
 	sts counterTimer, yl
     sts counterTimer+1, yh
+
+;	lds r24, BacklightFadeCounter			; load the backlight fade counter
+;	inc r24									; increment the counter
+;	sts BacklightFadeCounter, r24
+;	cpi r24, 30								; check if has been 1sec/0xFF
+;	brne fadeFinished
+;	
+;	clr temp1								; reset fade counter
+;	sts BacklightFadeCounter, temp1	
+;
+;;	lds temp1, BacklightFade				; check what fade state
+;	cpi temp1, LCD_BACKLIGHT_FADEIN
+;	breq fadeIn
+;	cpi temp1, LCD_BACKLIGHT_FADEOUT
+;	breq fadeOut
+;;	rjmp fadeFinished
+;
+;	fadeIn:									; if fading in
+;		lds temp2, BacklightPWM
+;		cpi temp2, 0xFF						; check if already max brightness
+;		breq lcdBacklightMax
+;;		inc temp2							; inc pwm
+;		sts BacklightPWM, temp2				; store new pwm
+;		rjmp dispLCDBacklight		
+;
+;		lcdBacklightMax:
+;;			ldi temp1, LCD_BACKLIGHT_STABLE	; set to stable pwm
+;			sts BacklightFade, temp1		; store new fade state
+;			rjmp fadeFinished
+;
+;	fadeOut:
+;;		lds temp2, BacklightPWM				; if fading out
+;		cpi temp2, 0x00						; check if min brightness
+;		breq lcdBacklightMin
+;		dec temp2							; dec pwm
+;		sts BacklightPWM, temp2				;store new pwm
+;		rjmp dispLCDBacklight
+;
+;		lcdBacklightMin:
+;			ldi temp1, LCD_BACKLIGHT_STABLE
+;			sts BacklightFade, temp1
+;			rjmp fadeFinished
+;
+;	dispLCDBacklight:
+;;		lds temp1, BacklightPWM
+;		sts OCR4AL, temp1
+;		clr temp1
+;		sts OCR4AH, temp1	
+;;	
+;	fadeFinished:
+;	; if running the backlight should remain on
+;	lds temp1, mode							; load the mode
+;	cpi temp1, RUNNING						; check if running
+;	breq timer2Epilogue
+;;		
+;	lds r24, BacklightCounter				; load the backlight counter
+;	lds r25, BacklightCounter+1
+;	adiw r25:r24, 1							; increment the counter
+;		
+;	sts BacklightCounter, r24				; store new values
+;;	sts BacklightCounter+1, r25
+
+	secondcheck:
 	ldi temp, high(30)
 	cpi yl, low(30)
 	cpc yh, temp
 	breq runTimer1
 	rjmp endTimer1		; fix for out of range branch
+
+
+;	cpi backlightstatus, 1 
+; 	brne runTimer1
+;	clr temp1								; clear the counter
+;	sts BacklightCounter, temp1
+;	sts BacklightCounter+1, temp1
+;
+;	lds r24, BacklightSeconds				; load backlight seconds
+;	inc r24									; increment the baclight seconds
+;	sts BacklightSeconds, r24				; store new value
+;;
+;	cpi r24, 10								; check if it has been 10 seconds
+;	brne timer2Epilogue
+;	
+;	clr temp1								; reset the seconds
+;	sts BacklightSeconds, temp1
+;
+;	clr temp2
+;	lds temp1, door
+;	cpi temp1, 0
+;	breq fadeOutBacklight
+;	ldi temp2, DOOR_LIGHT_MASK	
+
+;	fadeOutBacklight:						; start fading out the backlight
+;		rcall backlightFadeOut
+;
+
 	runTimer1:
 
 	inc counter
@@ -315,7 +414,9 @@ Timer1OVF: ;This is a countdown timer (16-bit)
 	contPotReset:
 
 	do_lcd_write_str str_reset_msg
+	rjmp Timer1prologue
 
+Timer1prologue:
 	rcall asciiconv
 	rjmp endTimer1
 	endTimer1:
@@ -384,6 +485,7 @@ nextcol: ; if row scan is over
 	inc col ; increase column value
 	jmp colloop
 convert:	
+	rcall backlightFadeIn			;;initialise the backlight to begin to fade in
 	cpi col, 3 ; If the pressed key is in col.3 
 	breq letters ; we have a letter
 				 ; If the key is not in col.3 and
