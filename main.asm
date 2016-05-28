@@ -72,8 +72,10 @@ randomcode: .byte 2
 str_home_msg: .db "2121 16s1", 1, "Safe Cracker", 0
 str_findposition_msg: .db "Find POT POS", 1, "Remaining: ", 0
 str_timeout_msg: .db "Game over", 1, "You Lose!", 0 
+str_win_msg: .db "Game complete", 1, "You Win!", 0 
 str_reset_msg: .db "Reset POT to 0", 1, "Remaining ", 0
 str_countdown_msg: .db "2121 16s1", 1, "Starting in ", 0
+str_entercode_msg: .db "Enter Code", 1, " ", 0
 	
 RESET:
 	;;;;;;;;prepare STACK;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -211,6 +213,7 @@ createADCint
 	rjmp endTimer0
 
 	winSeg:
+	do_lcd_write_str str_win_msg  
 	rjmp endTimer0
 	;	Timer:
 ;	in temp, SREG
@@ -453,7 +456,7 @@ endTimer3:
 	reti
 reenter:
 	clr temp 				;to reset if user enters wrong code
-	;clr 
+	do_lcd_write_str str_entercode_msg
 	rjmp endTimer3
 	
 EXT_INT_R:
@@ -504,19 +507,11 @@ handleADC:
 	reti
 
 asciiconv:				;no need for ascii convert as digits show up as '*' (we need this for count down)
-	push r17
 	push r18
 	push r19
 	push temp
 	clr r18
 	clr r19
-	clr r17
-	numhundreds:
-	cpi temp, 100
-	brlo numtens ;branch if lower due to unsigned
-	inc r17
-	subi temp, 100
-	rjmp numhundreds
 	numtens:
 	cpi temp, 10
 	brlo numones ;branch if lower due to unsigned
@@ -526,9 +521,6 @@ asciiconv:				;no need for ascii convert as digits show up as '*' (we need this 
 	numones:
 	mov r18, temp
 	ldi temp, '0'
-	addi r17, '0'
-	cpse r17, temp
-	do_lcd_data r17
 	addi r19, '0'
 	do_lcd_data r19
 	addi r18, '0'
@@ -536,7 +528,6 @@ asciiconv:				;no need for ascii convert as digits show up as '*' (we need this 
 	pop temp
 	pop r19
 	pop r18
-	pop r17
 	ret
 
 ;;;;;;;LEAVE THIS HERE - NEEDS TO BE INCLUDED LAST!!!;;;;;;;
