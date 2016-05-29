@@ -413,7 +413,7 @@ Timer2OVF:									; interrupt subroutine timer 2
 	push r24
 	push r25	
 
-	lds r24, BacklightFadeCounter			; load the backlight fade counter
+	lds r24, BacklightFadeCounter						; load the backlight fade counter
 	inc r24									; increment the counter
 	sts BacklightFadeCounter, r24
 	cpi r24, 30								; check if has been 1sec/0xFF
@@ -426,7 +426,7 @@ Timer2OVF:									; interrupt subroutine timer 2
 	cpi temp, LCD_BACKLIGHT_FADEIN
 	breq fadeIn
 	cpi temp, LCD_BACKLIGHT_FADEOUT
-	breq fadeOut					;if BacklightFade = 0
+	breq fadeOut					;if BacklightFade = 0 which is the case when it is first set up
 	rjmp fadeFinished
 
 	fadeIn:									; if fading in
@@ -458,8 +458,8 @@ Timer2OVF:									; interrupt subroutine timer 2
 	dispLCDBacklight:
 		lds temp, BacklightPWM
 		sts OCR3AL, temp
-		clr temp
-		sts OCR3AH, temp	
+		;clr temp
+		;sts OCR3AH, temp	
 	
 	fadeFinished:
 	; if running the backlight should remain on
@@ -483,11 +483,12 @@ Timer2OVF:									; interrupt subroutine timer 2
 	sts BacklightCounter+1, temp
 
 	lds r24, BacklightSeconds				; load backlight seconds
-	inc r24									; increment the baclight seconds
+	inc r24									; increment the backlight seconds
 	sts BacklightSeconds, r24				; store new value
 
 	cpi r24, 5								; check if it has been 5 seconds
-	brne timer2Epilogue							
+	brne timer2Epilogue
+	clr temp							
 	sts BacklightSeconds, temp					; reset the seconds
 	fadeOutBacklight:						; start fading out the backlight
 		rcall backlightFadeOut
