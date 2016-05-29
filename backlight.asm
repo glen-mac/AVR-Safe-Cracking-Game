@@ -30,10 +30,10 @@ initialiseBacklightTimer:
 backlightFadeIn:
 	push temp
 
-	ldi temp1, LCD_BACKLIGHT_FADEIN				; set backlight fade state to fade in
+	ldi temp, LCD_BACKLIGHT_FADEIN				; set backlight fade state to fade in
 	sts BacklightFade, temp	
 	
-	clr temp1									; reset the backlight counter
+	clr temp									; reset the backlight counter
 	sts BacklightSeconds, temp
 	sts BacklightCounter, temp
 	sts BacklightCounter+1, temp
