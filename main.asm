@@ -18,11 +18,12 @@
 .include "macros.asm"
 
 ;;;;;;;;;;;;CONSTANTS;;;;;;;;;;;;;;;;;;;
-.equ debDELAY = 800 	;Variable debounce delay
+;.equ debDELAY = 800 	;Variable debounce delay
 .equ PORTLDIR = 0xF0 	; PD7 - 4: output, PD3 - 0, input
 .equ INITCOLMASK = 0xEF ; scan from the rightmost column,
 .equ INITROWMASK = 0x01 ; scan from the top row
 .equ ROWMASK = 0x0F
+.equ max_num_rounds = 3
 .equ counter_initial = 3
 .equ counter_find_pot = 20
 .equ pot_pos_min = 35 ; our min value on the POT is 21
@@ -36,7 +37,6 @@
 .equ stage_win = 6
 .equ stage_lose = 7
 ;;;;;;;;;;;;REGISTER DEFINES;;;;;;;;;;;;
-.def debounce = r2  	; debounce flag boolean for push buttons
 .def screenStage = r3	; current stage the game is on
 .def screenStageFol = r4; a backlog of screenstage
 .def counter = r5		; a countdown variable
@@ -47,6 +47,9 @@
 .def cmask = r19		; mask for current column during scan
 .def temp = r20			; temp variable
 .def temp2 = r21		; temp variable
+.def keypadCode = r22
+.def curRound = r23
+.def difficultyCount = r24
 
 .dseg
 counterTimer: .byte 2
@@ -76,9 +79,9 @@ BacklightPWM: .byte 1 							; current backlight brightness
 .org 0x3A
 	jmp handleADC
 
-.org 0x50
-;STRING LIST:  (1 denotes a new line, 0 denotes end of second line)
+.org 0x70 ;STRING LIST:  (1 denotes a new line, 0 denotes end of second line)
 str_home_msg: .db "2121 16s1", 1, "Safe Cracker", 0
+str_keypadscan_msg: .db "Position found!", 1, "Scan for number", 0
 str_findposition_msg: .db "Find POT POS", 1, "Remaining: ", 0
 str_timeout_msg: .db "Game over", 1, "You Lose!", 0 
 str_win_msg: .db "Game complete", 1, "You Win!", 0 
@@ -132,10 +135,10 @@ RESET:
 	ldi temp, (1<<CS11)
 	sts TCCR3B, temp
 	toggle TIMSK0, 1<<TOIE0
-	;toggle TIMSK2, 1<<TOIE2
+	toggle TIMSK2, 1<<TOIE2  ;timer for difficulty
 	toggle TIMSK3, 1<<TOIE3
 	;;;;;;;;prepare MISC;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-  	ldi temp, PORTLDIR ; PA7:4/PA3:0, out/in
+  	ldi temp, PORTLDIR 	;KEYPAD
 	sts DDRL, temp
 	
 	ldi temp, 0xFF
@@ -157,8 +160,7 @@ RESET:
 	out DDRE, temp
 	ser temp										; clear PORTH
 	out PORTE, temp	
-	;out OCR3BL, temp
-	
+
 	rcall initialiseBacklightTimer  ;;code for the backlight timer
 	
 	clr r24
@@ -167,8 +169,8 @@ RESET:
 	clr r22
 	clr screenStage		; initial screen (click left button to start)
 	clr counter
-	ldii debounce, 1
 	ldii running, 0 
+	ldi difficultyCount, 20
 
 	clear_datamem counterTimer
 	do_lcd_write_str str_home_msg ;write home message to screen
@@ -290,8 +292,9 @@ countdownFunc:
 potResetFunc:
 	cpii screenStageFol, stage_pot_reset
 	breq endpotResetSeg
+	toggle TIMSK2, 0  ;disable keypad
 	do_lcd_write_str str_reset_msg ;this is the reset pot message?
-	ldi temp, 20
+	mov temp, difficultyCount
 	rcall asciiconv
 	ldii screenStageFol, stage_pot_reset
 	lds temp, ADCSRA      ;enable ADC
@@ -349,9 +352,10 @@ codeFindFunc:
 	cpii screenStageFol, stage_code_find
 	breq endcodeFindSeg
 	ldii screenStageFol, stage_code_find
+	do_lcd_write_str str_keypadscan_msg
 	lds temp, ADCSRA 
 	cbr temp, (ADSC + 1)   ;enable ADC
-	;sts ADCSRA, temp      ;enable ADC
+	sts ADCSRA, temp      ;enable ADC
 	endcodeFindSeg:
 	ret
 	
@@ -402,7 +406,7 @@ Timer1OVF: ;This is a countdown timer (16-bit)
 			rjmp endTimer1
 
 	countPotResetFind:
-		ldi temp, 20
+		mov temp, difficultyCount
 		sub temp, counter
 		cpi temp, 0
 		brne contPotResetFind
@@ -437,7 +441,7 @@ Timer3OVF:									; interrupt subroutine timer 2
 	lds r24, BacklightFadeCounter						; load the backlight fade counter
 	inc r24									; increment the counter
 	sts BacklightFadeCounter, r24
-	cpi r24, 30								; check if has been 1sec/0xFF
+	cpi r24, 15							; check if has been 1sec/0xFF
 	brne fadeFinished
 	
 	clr temp								; reset fade counter
@@ -493,8 +497,8 @@ Timer3OVF:									; interrupt subroutine timer 2
 	sts BacklightCounter, r24				; store new values
 	sts BacklightCounter+1, r25
 
-	cpi r24, low(7812)						; check if it has been 1 second
-	ldi temp, high(7812)
+	cpi r24, low(3906)						; check if it has been 1 second
+	ldi temp, high(3906)
 	cpc r25, temp
 	brne timer3Epilogue
 	
@@ -531,11 +535,13 @@ Timer2OVF: ;keypad loop
 	push rmask
 	push cmask
 	push temp
+	push temp2
 	clr col
 	clr row
 	clr rmask
-	clr cmask
 	clr temp
+	clr temp2
+	ldi cmask, INITCOLMASK ; initial column mask
 colloop:
 	cpi col, 4
 	brne contColloop; If all keys are scanned, repeat.
@@ -567,55 +573,59 @@ nextcol: ; if row scan is over
 	jmp colloop
 convert:	
 ;	rcall backlightFadeIn			;;initialise the backlight to begin to fade in
-	cpi col, 3 ; If the pressed key is in col.3 
-	breq letters ; we have a letter
+	;cpi col, 3 ; If the pressed key is in col.3 
+	;breq letters ; we have a letter
 				 ; If the key is not in col.3 and
-	cpi row, 3 ; If the key is in row3,
-	breq symbols; we have a symbol or 0
+	;cpi row, 3 ; If the key is in row3,
+	;breq symbols; we have a symbol or 0
 	mov temp, row ; Otherwise we have a number in 1 -9
 	lsl temp
-	add temp, row
-	add temp, col ; temp = row*3 + col
-	subi temp, -'1'
-	rjmp comparecode
-symbols:
-	cpi col, 0 ; Check if we have a star
-	breq star ;star
-	cpi col, 1 ; or if we have zero
-	breq zero
-	ldi temp, '#'
-	rjmp comparecode
-star:
-	ldi temp, '*'	;need to display this key too
-	rjmp comparecode
-zero:
-	ldi temp, 0; Set to zero
-	rjmp comparecode
-letters:	
+	lsl temp
+	add temp, col ; temp = row*4 + col
+	;addi temp, '0'
+	;do_lcd_data temp
+	;subi temp, -'1'
 	cpii screenStage, stage_start
-	brne entercode
+	breq setDifficulty
+	rjmp comparecode
+;symbols:
+;	cpi col, 0 ; Check if we have a star
+;	breq star ;star
+;	cpi col, 1 ; or if we have zero
+;	breq zero
+;	ldi temp, '#'
+;	rjmp comparecode
+;star:
+;	ldi temp, '*'	;need to display this key too
+;	rjmp comparecode
+;zero:
+;	ldi temp, 0; Set to zero;
+;	rjmp comparecode
+setDifficulty:	
 	A:
-	cpi row, 0 ;A
+	cpi temp, 3 ;A
 	brne B
-;	ldi countdown, 20
-;	rjmp ResetPot
+	ldi difficultyCount, 20
+	rjmp endTimer2
 	B:
-	cpi row, 1 ;B
+	cpi temp, 7 ;B
 	brne C
-;	ldi countdown, 15
-;	rjmp ResetPot
+	ldi difficultyCount, 15
+	rjmp endTimer2
 	C:
-	cpi row, 2 ;C
+	cpi temp, 11 ;C
 	brne D
-;	ldi countdown, 10
-;	rjmp ResetPot
-	D:						
-;	ldi countdown, 6
-;	rjmp ResetPot	
+	ldi difficultyCount, 10
+	rjmp endTimer2
+	D:	
+	cpi temp, 15 ;C	
+	brne endTimer2				
+	ldi difficultyCount, 6
+	rjmp endTimer2	
 
-	entercode:	;if not for difficulty
-	ldi temp, 'A'
-	add temp, row
+	;entercode:	;if not for difficulty
+	;ldi temp, 'A'
+	;add temp, row
 comparecode: 		;compare the letter pressed, if it is equal to the sequential letter of the next sequence proceed with the code 
 ;	lds yl, counterTimer
 	;lds yh, counterTimer+1
@@ -623,24 +633,25 @@ comparecode: 		;compare the letter pressed, if it is equal to the sequential let
 	
 	;ldi ZL, LOW(randomcode)
 	;ldi ZH, HIGH(randomcode)
-	lpm temp2, Z+
-	cpse temp2, temp
-	rjmp reenter
-	ldi temp, '*'			
-	do_lcd_data temp
-	toggle TIMSK2, 1<<TOIE2
-	ldii debounce, 1
+;	lpm temp2, Z+
+;	cpse temp2, temp
+;	rjmp reenter
+;	ldi temp, '*'			
+;	do_lcd_data temp
+;	toggle TIMSK2, 1<<TOIE2
+;	ldii debounce, 1
 endTimer2:
+	pop temp2
 	pop temp
 	pop cmask
 	pop rmask
 	pop row
 	pop col
 	reti
-reenter:
-	clr temp 				;to reset if user enters wrong code
-	do_lcd_write_str str_entercode_msg
-	rjmp endTimer2
+;reenter:
+;	clr temp 				;to reset if user enters wrong code
+;	do_lcd_write_str str_entercode_msg
+;	rjmp endTimer2
 	
 EXT_INT_R:
 	;;;;HOW TO USE PUSH BUTTONS:
@@ -653,9 +664,9 @@ EXT_INT_R:
 	reti
 
 EXT_INT_L:
-	cpii debounce, 1
-	brne endIntL
-	clr debounce
+	;cpii debounce, 1
+	;brne endIntL
+	;clr debounce
 	;check screenstage 'switch statement'
 	cpii screenStage, stage_start ;check if on start screen
 	brne checkStageWin
@@ -666,8 +677,8 @@ EXT_INT_L:
 	brne preEndInt
 	ldii screenStage, stage_start
 	preEndInt:
-	toggle TIMSK2, 1<<TOIE2
-	endIntL:
+	;toggle TIMSK, 1<<TOIE2
+	;endIntL:
 	reti
 
 handleADC:
