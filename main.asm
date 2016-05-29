@@ -758,7 +758,7 @@ EXT_INT_R:
 EXT_INT_L:
 	cpii debounce, 0
 	brne preEndInt
-
+	rcall backlightFadeIn
 	cpii screenStage, stage_start ;check if on start screen
 	brne checkStageWin
 	ldii screenStage, stage_countdown
