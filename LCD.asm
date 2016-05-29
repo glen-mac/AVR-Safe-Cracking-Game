@@ -21,6 +21,33 @@
 ; Send a command to the LCD (r16)
 ;
 
+
+lcd_set_pos:
+	out PORTF, r16
+	lcd_clr LCD_RS
+	rcall sleep_1ms
+	lcd_set LCD_E
+	rcall sleep_1ms
+	lcd_clr LCD_E
+	rcall sleep_1ms
+	lcd_clr LCD_RW
+	rcall sleep_1ms
+	ret
+
+lcd_set_dat:
+	out PORTF, r16
+	lcd_clr LCD_RS
+	rcall sleep_1ms
+	lcd_set LCD_RS
+	rcall sleep_1ms
+	lcd_set LCD_E
+	rcall sleep_1ms
+	lcd_clr LCD_E
+	rcall sleep_1ms
+	lcd_clr LCD_RW
+	rcall sleep_1ms
+	ret
+
 lcd_command:
 	out PORTF, r16
 	rcall sleep_1ms

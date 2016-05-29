@@ -1,4 +1,6 @@
-;Clear word of data memory
+; Clear 2-byte word of data memory (set to 0)
+; Params: 
+; 0) 16bit address of first byte
 .macro clear_datamem
 	push temp
 	push yl
@@ -13,21 +15,35 @@
 	pop temp
 .endmacro
 
-;Does LCD Command
+; Does LCD Command
+; Params: 
+; 0) 8bit command
 .macro do_lcd_command
 	ldi r16, @0
 	rcall lcd_command
 	rcall lcd_wait
 .endmacro
 
-;Pass this macro an immediate value, and it will put
-;the value on screen
+; Put immediate value on screen
+; Params: 
+; 0) 8bit immediate value
 .macro do_lcd_data_i
 	ldi r16, @0
 	do_lcd_data r16
 .endmacro
 
-;Pass this macro an register, and it will put
+
+.macro do_lcd_set_pos
+	ldi r16, @0
+	rcall lcd_set_pos
+.endmacro
+
+.macro do_lcd_set_dat
+	ldi r16, @0
+	rcall lcd_set_dat
+.endmacro
+
+; Pass this macro a register, and it will put
 ;the value within the register on screen
 .macro do_lcd_data
 	mov r16, @0
@@ -122,14 +138,15 @@
 	clr debounce
 .endmacro
 
+;Toggles the strobe light when called
 .macro toggleStrobe
-push temp
-push temp2
-	in temp, PORTA
-	ldi temp2, 0b00000010
-	eor temp, temp2
-	out PORTA, temp	
-pop temp2
-pop temp
+	push temp
+	push temp2
+		in temp, PORTA
+		ldi temp2, 0b00000010
+		eor temp, temp2
+		out PORTA, temp	
+	pop temp2
+	pop temp
 .endmacro
 

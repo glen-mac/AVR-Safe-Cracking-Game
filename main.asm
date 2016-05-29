@@ -101,6 +101,33 @@ RESET:
 	clr r16
 	out PORTF, r16
 	out PORTA, r16
+
+
+
+do_lcd_set_pos 0b01001000
+do_lcd_set_dat 0b11101010
+
+do_lcd_set_pos 0b01001001
+do_lcd_set_dat 0b11100000
+
+do_lcd_set_pos 0b01001010
+do_lcd_set_dat 0b11110001
+
+do_lcd_set_pos 0b01001011
+do_lcd_set_dat 0b11101110
+
+do_lcd_set_pos 0b01001100
+do_lcd_set_dat 0b11100000
+
+do_lcd_set_pos 0b01001101
+do_lcd_set_dat 0b11100000
+
+do_lcd_set_pos 0b01001110
+do_lcd_set_dat 0b11100000
+
+do_lcd_set_pos 0b01001111
+do_lcd_set_dat 0b11100000
+
 	do_lcd_command 0b00111000 ; 2x5x7
 	do_lcd_command 0b00001000 ; display off
 	do_lcd_command 0b00000001 ; clear display
@@ -164,6 +191,11 @@ RESET:
 	clear_datamem keypadTimer
 
 	do_lcd_write_str str_home_msg ;write home message to screen
+
+	do_lcd_data_i 0b00000001
+
+
+
 
 	sei
 	
