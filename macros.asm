@@ -105,20 +105,31 @@
 .endmacro
 
 .macro cleanAllReg
-clr screenStage		
-clr screenStageFol 	
-clr counter		
-clr running			
-clr keyButtonPressed	
-clr row				
-clr col				
-clr rmask				
-clr cmask				
-clr temp				
-clr temp2				
-clr keypadCode		
-clr curRound		
-clr difficultyCount
-clr debounce
+	clr screenStage		
+	clr screenStageFol 	
+	clr counter		
+	clr running			
+	clr keyButtonPressed	
+	clr row				
+	clr col				
+	clr rmask				
+	clr cmask				
+	clr temp				
+	clr temp2				
+	clr keypadCode		
+	clr curRound		
+	clr difficultyCount
+	clr debounce
+.endmacro
+
+.macro toggleStrobe
+push temp
+push temp2
+	in temp, PORTA
+	ldi temp2, 0b00000010
+	eor temp, temp2
+	out PORTA, temp	
+pop temp2
+pop temp
 .endmacro
 
