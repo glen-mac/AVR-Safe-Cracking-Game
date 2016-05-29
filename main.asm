@@ -16,7 +16,6 @@
 
 .include "m2560def.inc"
 .include "macros.asm"
-;.include "backlight.asm"
 
 ;;;;;;;;;;;;CONSTANTS;;;;;;;;;;;;;;;;;;;
 .equ debDELAY = 800 	;Variable debounce delay
@@ -764,4 +763,6 @@ asciiconv:				;no need for ascii convert as digits show up as '*' (we need this 
 	ret
 
 ;;;;;;;LEAVE THIS HERE - NEEDS TO BE INCLUDED LAST!!!;;;;;;;
+.include "backlight.asm"
 .include "LCD.asm"
+
