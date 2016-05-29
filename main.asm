@@ -153,10 +153,11 @@ RESET:
 	out PORTC, temp  ;BLANK the LED bar
 	out PORTG, temp  ;BLANK the top LEDs on LED bar
 	
-	ldi temp, (0b11 << 3)	; set PORTE (pins 2&3) to output (Backlight = 2, Motor = 3)
-	sts DDRE, temp
+	ldi temp, 0b00010000      ; set PORTE (pins 2&3) to output (Backlight = 2, Motor = 3)
+	out DDRE, temp
 	ser temp										; clear PORTH
-	sts PORTE, temp	
+	out PORTE, temp	
+	;out OCR3BL, temp
 	
 	rcall initialiseBacklightTimer  ;;code for the backlight timer
 	
