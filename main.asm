@@ -571,7 +571,7 @@ Timer2OVF: ;keypad loop
 colloop:
 	cpi col, 4
 	brne contColloop; If all keys are scanned, repeat.
-
+	
 	;check if in findCode
 	cpii screenStageFol, stage_code_find
 	breq motorKill
@@ -614,7 +614,13 @@ convert:
 	lsl temp
 	lsl temp
 	add temp, col ; temp = row*4 + col
-
+	
+	cpii screenStage, stage_win
+	breq RESET
+	
+	cpiiscreenStage, stage_lose
+	breq RESET
+	
 	cpii screenStage, stage_start
 	breq setDifficulty
 
