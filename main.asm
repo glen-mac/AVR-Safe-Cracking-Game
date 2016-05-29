@@ -1,5 +1,5 @@
 ;;;;;;;;;;;;; TO DO ;;;;;;;;
-; Get Keypad done, then implement rcall backlightFadeIn after we detect precense in the keypad
+; implement rcall backlightFadeIn 
 ;
 ; Implement Sound
 ;
@@ -10,40 +10,38 @@
 .include "macros.asm"
 
 ;;;;;;;;;;;;CONSTANTS;;;;;;;;;;;;;;;;;;;
-;.equ debDELAY = 800 	;Variable debounce delay
 .equ PORTLDIR			= 0xF0 	; PD7 - 4: output, PD3 - 0, input
-.equ INITCOLMASK		= 0xEF ; scan from the rightmost column,
-.equ INITROWMASK		= 0x01 ; scan from the top row
-.equ ROWMASK			= 0x0F
-.equ max_num_rounds		= 1
-.equ counter_initial	= 3
-.equ counter_find_pot	= 20
-.equ pot_pos_min		= 22 ; our min value on the POT is 21
-.equ pot_pos_max		= 1004
-.equ stage_start		= 0
-.equ stage_countdown	= 1
-.equ stage_pot_reset	= 2
-.equ stage_pot_find		= 3
-.equ stage_code_find	= 4
-.equ stage_code_enter	= 5
-.equ stage_win 			= 6
-.equ stage_lose 		= 7
+.equ INITCOLMASK		= 0xEF 	; scan from the rightmost column,
+.equ INITROWMASK		= 0x01 	; scan from the top row
+.equ ROWMASK			= 0x0F	; mask for the row
+.equ max_num_rounds		= 1		; the number of rounds that will be played
+.equ counter_initial	= 3		; the intial countdown value
+.equ pot_pos_min		= 22	; the minimum value on the pot
+.equ pot_pos_max		= 1004	; the maximum value on the pot
+.equ stage_start		= 0		; |  The
+.equ stage_countdown	= 1		; |		stage
+.equ stage_pot_reset	= 2		; |			 values
+.equ stage_pot_find		= 3		; |				 representing
+.equ stage_code_find	= 4		; |			 what
+.equ stage_code_enter	= 5		; |		 stage
+.equ stage_win 			= 6		; |	  we are
+.equ stage_lose 		= 7		; | on
 ;;;;;;;;;;;;REGISTER DEFINES;;;;;;;;;;;;
-.def debounce			= r2
-.def screenStage		= r3	; current stage the game is on
-.def screenStageFol 	= r4	; a backlog of screenstage
-.def counter			= r5	; a countdown variable
-.def running			= r6	
-.def keyButtonPressed	= r7	
-.def row				= r16 	; current row number
-.def col				= r17 	; current column number
-.def rmask				= r18 	; mask for current row during scan
-.def cmask				= r19	; mask for current column during scan
+.def debounce			= r2	; a flag debouncing PB1, when PB1 is clicked when the game is won or lost
+.def screenStage		= r3	; the current stage the game is on
+.def screenStageFol 	= r4	; a delayed version of screenstage (for checking when it is desired that the initial stage code has already run)
+.def counter			= r5	; a generic countdown register
+.def running			= r6	; a flag represeting if the backlight should be on indefinitely on the current screen
+.def keyButtonPressed	= r7	; an internal debounce flag for the keypad
+.def row				= r16 	; keypad current row number
+.def col				= r17 	; keypad current column number
+.def rmask				= r18 	; keypad mask for current row during scan
+.def cmask				= r19	; keypad mask for current column during scan
 .def temp				= r20	; temp variable
-.def temp2				= r21	; temp variable
-.def keypadCode			= r22
-.def curRound			= r23
-.def difficultyCount	= r24
+.def temp2				= r21	; second temp variable
+.def keypadCode			= r22	; the 'random' code being searched for on the keypad
+.def curRound			= r23	; a counter representing the current round (used for addressing memory)
+.def difficultyCount	= r24	; a register holding the countdown value for the current difficulty
 ;;;;;;;;;;;;DESEG VARIABLES;;;;;;;;;;;;
 .dseg
 gameloopTimer:			.byte 2	; counts number of timer overflows for gameloop
@@ -60,19 +58,19 @@ BacklightPWM: 			.byte 1 ; current backlight brightness
 ;.org 0x0
 	jmp RESET
 ;.org 0x2
-	jmp EXT_INT_R	;right push button
+	jmp EXT_INT_R	; right push button
 ;.org 0x4
-	jmp EXT_INT_L	;left push button
+	jmp EXT_INT_L	; left push button
 .org OVF0addr
-	jmp Timer0OVF	;game loop
+	jmp Timer0OVF	; game loop
 .org OVF1addr
-	jmp Timer1OVF	;debounce timer for push buttons
+	jmp Timer1OVF	; countdown timer
 .org OVF2addr
-	jmp Timer2OVF	;debounce timer for push buttons
+	jmp Timer2OVF	; keypad timer
 .org OVF3addr
-	jmp Timer3OVF	;keypad search code
+	jmp Timer3OVF	; backlight timer
 .org 0x3A
-	jmp handleADC
+	jmp handleADC	; ADC complete reading
 ;;;;;;;;;;;;STRING LIST;;;;;;;;;;;;;;
 .org 0x70 ;(1 denotes a new line, 0 denotes end of second line)
 str_home_msg: 			.db 	"2121 16s1", 		1, 		"Safe Cracker", 	0
@@ -92,18 +90,13 @@ RESET:
 	out SPH, temp
   	;;;;;;;;prepare LCD;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	ser r16
-	out DDRF, r16 ;LCD?
+	out DDRF, r16 
 	out DDRA, r16 
 	clr r16
 	out PORTF, r16
 	out PORTA, r16
 	do_lcd_command 0b00111000 ; 2x5x7
-	rcall sleep_5ms
-	do_lcd_command 0b00111000 ; 2x5x7
-	rcall sleep_1ms
-	do_lcd_command 0b00111000 ; 2x5x7
-	do_lcd_command 0b00111000 ; 2x5x7
-	do_lcd_command 0b00001000 ; display off?
+	do_lcd_command 0b00001000 ; display off
 	do_lcd_command 0b00000001 ; clear display
 	do_lcd_command 0b00000110 ; increment, no display shift
 	do_lcd_command 0b00001110 ; Cursor on, bar, no blink
@@ -272,7 +265,6 @@ countdownFunc:
 potResetFunc:
 	cpii screenStageFol, stage_pot_reset
 	breq endpotResetSeg
-	;toggle TIMSK2, 0  ;disable keypad
 	do_lcd_write_str str_reset_msg ;this is the reset pot message?
 	mov temp, difficultyCount
 	rcall asciiconv
@@ -567,7 +559,6 @@ colloop:
 	cpi col, 4
 	brne contColloop; If all keys are scanned, repeat.
 	
-	;check if in findCode
 	cpii screenStageFol, stage_code_find
 	breq motorKill
 	clr keyButtonPressed
@@ -755,10 +746,6 @@ endTimer2:
 	pop yh
 	pop yl
 	reti
-;reenter:
-;	clr temp 				;to reset if user enters wrong code
-;	do_lcd_write_str str_entercode_msg
-;	rjmp endTimer2
 	
 EXT_INT_R:
 	rjmp RESET
