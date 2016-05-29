@@ -317,9 +317,6 @@ potFindFunc:
 	cpc rmask, temp
 	brlo pickRandPotVal
 
-	;ldi cmask, low(480)
-	;ldi rmask, high(480)
-
 	clr row 			    ; this register used to ensure FIND position is helf for 500ms
 	clr col					; this register used to counter amount of times row has been seen to
 							; be one (obviously after checking twice in 500ms intervals it is FOUND)
