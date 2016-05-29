@@ -40,7 +40,7 @@
 .def screenStage = r3	; current stage the game is on
 .def screenStageFol = r4; a backlog of screenstage
 .def counter = r5		; a countdown variable
-.def running = r6
+.def running = r6		
 .def row = r16 			; current row number
 .def col = r17 			; current column number
 .def rmask = r18 		; mask for current row during scan
@@ -132,7 +132,7 @@ RESET:
 	ldi temp, (1<<CS31)
 	sts TCCR3B, temp
 	toggle TIMSK0, 1<<TOIE0
-	;toggle TIMSK2, 1<<TOIE2
+	toggle TIMSK2, 1<<TOIE2
 	;toggle TIMSK3, 1<<TOIE3
 	;;;;;;;;prepare MISC;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   	ldi temp, PORTLDIR ; PA7:4/PA3:0, out/in
@@ -140,7 +140,7 @@ RESET:
 	
 	ldi temp, 0xFF
 	out DDRC, temp	;PORTC is for LED bar
-	out DDRG, temp
+	out DDRG, temp	;PORTG is for LED bar (top 2 LEDs)
 		
 	ldi temp, (1 << REFS0) | (0 << ADLAR) | (0 << MUX0);     Set ADC reference to AVCC
 	sts ADMUX, temp
@@ -150,13 +150,13 @@ RESET:
 	sts ADCSRA, temp
 
 	clr temp
-	out PORTC, temp ;BLANK the LED bar
-	out PORTG, temp
+	out PORTC, temp  ;BLANK the LED bar
+	out PORTG, temp  ;BLANK the top LEDs on LED bar
 	
-	ser temp										; set PORTH to output (Backlight)
-	sts DDRH, temp
-	clr temp										; clear PORTH
-	sts PORTH, temp	
+	ldi temp, (0b11 << 2)	; set PORTE (pins 2&3) to output (Backlight = 2, Motor = 3)
+	sts DDRE, temp
+	ser temp										; clear PORTH
+	sts PORTE, temp	
 	
 	rcall initialiseBacklightTimer  ;;code for the backlight timer
 	
@@ -167,7 +167,7 @@ RESET:
 	clr screenStage		; initial screen (click left button to start)
 	clr counter
 	ldii debounce, 1
-	ldi running, 0 
+	ldii running, 0 
 
 	clear_datamem counterTimer
 	do_lcd_write_str str_home_msg ;write home message to screen
@@ -211,30 +211,31 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	rjmp endTimer0
 	
 	countdownSeg:
-	ldi running, 1
+	ldii running, 1
 	rcall countdownFunc
 	rjmp endTimer0
 
 	potResetSeg:
-	ldi running, 1 
+	ldii running, 1 
 	rcall potResetFunc
 	rjmp endTimer0
 
 	potFindSeg:
-	ldi running, 1 
+	ldii running, 1 
 	rcall potFindFunc
 	rjmp endTimer0
 
 	codeFindSeg:
-	ldi running, 1 
+	ldii running, 1 
+	rcall codeFindFunc
 	rjmp endTimer0
 
 	codeEnterSeg:
-	ldi running, 1 
+	ldii running, 1 
 	rjmp endTimer0
 
 	winSeg:
-	ldi running, 0 
+	ldii running, 0 
 	do_lcd_write_str str_win_msg  
 	rjmp endTimer0
 	;Timer:
@@ -259,7 +260,7 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 ;	out SREG, temp
 ;	reti 
 	loseSeg:
-	ldi running, 0
+	ldii running, 0
 	toggle TIMSK1, 0
 	toggle TIMSK0,0
 	do_lcd_write_str str_timeout_msg
@@ -301,6 +302,7 @@ potResetFunc:
 	endpotResetSeg:
 		cpi row, 1
 		breq incRESETpotCount	;BRNE out of range, so a quick fix
+		clr col
 		ret
 		incRESETpotCount:
 			inc col ;numbers of times you have seen row as 1
@@ -332,8 +334,26 @@ potFindFunc:
 	clr col					; this register used to counter amount of times row has been seen to
 							; be one (obviously after checking twice in 500ms intervals it is FOUND)
 	endpotFindSeg:
+		cpi row, 1
+		breq incFINDpotCount	;BRNE out of range, so a quick fix
+		clr col
+		ret
+		incFINDpotCount:
+			inc col ;numbers of times you have seen row as 1
+			cpi col, 10
+			ldii screenStage, stage_code_find
 	ret
 
+codeFindFunc:
+	cpii screenStageFol, stage_code_find
+	breq endcodeFindSeg
+	ldii screenStageFol, stage_code_find
+	lds temp, ADCSRA 
+	cbr temp, (ADSC + 1)   ;enable ADC
+	;sts ADCSRA, temp      ;enable ADC
+	endcodeFindSeg:
+	ret
+	
 
 Timer1OVF: ;This is a countdown timer (16-bit)
 	push yl
@@ -438,7 +458,7 @@ Timer2OVF:									; interrupt subroutine timer 2
 		rjmp dispLCDBacklight		
 
 		lcdBacklightMax:
-			ldi temp1, LCD_BACKLIGHT_STABLE	; set to stable pwm
+			ldi temp, LCD_BACKLIGHT_STABLE	; set to stable pwm
 			sts BacklightFade, temp		; store new fade state
 			rjmp fadeFinished
 
@@ -462,8 +482,8 @@ Timer2OVF:									; interrupt subroutine timer 2
 		;sts OCR3AH, temp	
 	
 	fadeFinished:
-	; if running the backlight should remain on
-	cpi running, 1						; check if running
+		; if running the backlight should remain on
+	cpii running, 1						; check if running
 	breq timer2Epilogue
 		
 	lds r24, BacklightCounter				; load the backlight counter

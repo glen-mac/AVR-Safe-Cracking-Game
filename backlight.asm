@@ -12,12 +12,12 @@ initialiseBacklightTimer:
 	sts BacklightCounter+1, temp
 	sts BacklightFadeCounter, temp
 	sts BacklightFade, temp
-	ldi temp1, 0xFF
+	ldi temp, 0xFF
 	sts BacklightPWM, temp
 
 	clr temp 							; initialise timer prescale
 	sts TCCR2A, temp
-	ldi temp1, 0b00000010
+	ldi temp, 0b00000010
 	sts TCCR2B, temp
 	
 	ser temp
