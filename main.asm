@@ -434,25 +434,25 @@ Timer3OVF:									; interrupt subroutine timer 2
 	in temp, SREG
 	push temp
 	push r24
-	push r25	
+	push r25
 
 	lds r24, BacklightFadeCounter						; load the backlight fade counter
 	inc r24									; increment the counter
 	sts BacklightFadeCounter, r24
-	cpi r24, 15							; check if has been 1sec/0xFF
+	cpi r24, 15							; check if has been 0.5sec/0xFF
 	brne fadeFinished
 	
 	clr temp								; reset fade counter
 	sts BacklightFadeCounter, temp	
 
-	lds temp, BacklightFade				; check what fade state
+	lds temp, BacklightFade						; check what fade state
 	cpi temp, LCD_BACKLIGHT_FADEIN
-	breq fadeIn
+	breq FadeIn
 	cpi temp, LCD_BACKLIGHT_FADEOUT
-	breq fadeOut					;if BacklightFade = 0 which is the case when it is first set up
-	rjmp fadeFinished
+	breq FadeOut							;if BacklightFade = 0 which is the case when it is first set up
+	rjmp FadeFinished 
 
-	fadeIn:									; if fading in
+	FadeIn:									; if fading in
 		lds temp2, BacklightPWM
 		cpi temp2, 0xFF						; check if already max brightness
 		breq lcdBacklightMax
@@ -463,9 +463,11 @@ Timer3OVF:									; interrupt subroutine timer 2
 		lcdBacklightMax:
 			ldi temp, LCD_BACKLIGHT_STABLE	; set to stable pwm
 			sts BacklightFade, temp		; store new fade state
-			rjmp fadeFinished
+			rjmp FadeFinished
 
-	fadeOut:
+	FadeOut:
+		cpii running, 1						; check if game is in one of the running stages 
+		breq timer3Epilogue 
 		lds temp2, BacklightPWM				; if fading out
 		cpi temp2, 0x00						; check if min brightness
 		breq lcdBacklightMin
@@ -481,17 +483,11 @@ Timer3OVF:									; interrupt subroutine timer 2
 	dispLCDBacklight:
 		lds temp, BacklightPWM
 		sts OCR3BL, temp
-		;clr temp
-		;sts OCR3AH, temp	
-	
-	fadeFinished:						; if running the backlight should remain on
-	cpii running, 1						; check if running
-	breq timer3Epilogue
 		
+	FadeFinished:						; if running the backlight should remain on
 	lds r24, BacklightCounter				; load the backlight counter
 	lds r25, BacklightCounter+1
 	adiw r25:r24, 1							; increment the counter
-		
 	sts BacklightCounter, r24				; store new values
 	sts BacklightCounter+1, r25
 
