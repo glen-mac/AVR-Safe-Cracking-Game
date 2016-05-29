@@ -7,6 +7,8 @@
 ;;Put keypad code in Timer0, with 0 prescaler (can disable with toggle macro)
 ;;when not needed)
 ;;
+; Get Keypad done, then implement rcall backlightFadeIn after we detect precense in the keypad
+;
 ;
 ;;Set TIMER 3 to 8 bit 
 ;;
@@ -158,8 +160,10 @@ RESET:
 	
 	ldi temp, 0b00010000      ; set PORTE (pins 2&3) to output (Backlight = 2, Motor = 3)
 	out DDRE, temp
+
 	ser temp										; clear PORTH
 	out PORTE, temp	
+
 
 	rcall initialiseBacklightTimer  ;;code for the backlight timer
 	
@@ -622,6 +626,7 @@ setDifficulty:
 	brne endTimer2				
 	ldi difficultyCount, 6
 	rjmp endTimer2	
+
 
 	;entercode:	;if not for difficulty
 	;ldi temp, 'A'
