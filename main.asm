@@ -477,7 +477,7 @@ Timer2OVF:									; interrupt subroutine timer 2
 
 	dispLCDBacklight:
 		lds temp, BacklightPWM
-		sts OCR3AL, temp
+		sts OCR3BL, temp
 		;clr temp
 		;sts OCR3AH, temp	
 	
