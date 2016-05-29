@@ -135,7 +135,7 @@ RESET:
 	ldi temp, (1<<CS11)
 	sts TCCR3B, temp
 	toggle TIMSK0, 1<<TOIE0
-	toggle TIMSK2, 1<<TOIE2  ;timer for difficulty
+	;toggle TIMSK2, 1<<TOIE2  ;timer for difficulty
 	toggle TIMSK3, 1<<TOIE3
 	;;;;;;;;prepare MISC;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   	ldi temp, PORTLDIR 	;KEYPAD
