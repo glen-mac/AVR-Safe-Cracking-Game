@@ -54,14 +54,15 @@
 .def difficultyCount = r24
 
 .dseg
-counterTimer: .byte 2
-randomcode: .byte 2
-;;;;;;;;;;;;;;;;;;;;;;BACKLIGHT;;;;;;;;;;;;;;;;;;;;;
-BacklightCounter: .byte 2 						; counts timer overflows
-BacklightSeconds: .byte 1 						; counts number of seconds to trigger backlight fade out
-BacklightFadeCounter: .byte 1 					; used to pace the fade in process
-BacklightFade: .byte 1 							; flag indicating current backlight process - stable/fade in/fade out
-BacklightPWM: .byte 1 							; current backlight brightness
+gameloopTimer: 			.byte 2		; counts number of timer overflows for gameloop
+counterTimer: 			.byte 2		; counts number of timer overflows for counter
+keypadTimer: 			.byte 2		; counts number of timer overflows for keypad
+randomcode: 			.byte 3		; stores the 3 'random' keypad items
+BacklightCounter: 		.byte 2 	; counts timer overflows
+BacklightSeconds: 		.byte 1		; counts number of seconds to trigger backlight fade out
+BacklightFadeCounter: 	.byte 1 	; used to pace the fade in process
+BacklightFade: 			.byte 1 	; flag indicating current backlight process - stable/fade in/fade out
+BacklightPWM: 			.byte 1 	; current backlight brightness
 
 .cseg
 ;.org 0x0
@@ -137,15 +138,21 @@ RESET:
 	ldi temp, (1<<CS11)
 	sts TCCR3B, temp
 	toggle TIMSK0, 1<<TOIE0
-	;toggle TIMSK2, 1<<TOIE2  ;timer for difficulty
+	toggle TIMSK2, 1<<TOIE2  ;timer for difficulty
 	toggle TIMSK3, 1<<TOIE3
 	;;;;;;;;prepare MISC;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   	ldi temp, PORTLDIR 	;KEYPAD
 	sts DDRL, temp
-	
+	ldi temp, 0b00010000  ; set PORTE (pins 2&3) to output (Backlight = 2, Motor = 3)
+	out DDRE, temp
 	ldi temp, 0xFF
 	out DDRC, temp	;PORTC is for LED bar
 	out DDRG, temp	;PORTG is for LED bar (top 2 LEDs)
+	ser temp										; clear PORTH
+	out PORTE, temp	
+	clr temp
+	out PORTC, temp  ;BLANK the LED bar
+	out PORTG, temp  ;BLANK the top LEDs on LED bar
 		
 	ldi temp, (1 << REFS0) | (0 << ADLAR) | (0 << MUX0);     Set ADC reference to AVCC
 	sts ADMUX, temp
@@ -154,51 +161,46 @@ RESET:
 	ldi temp, (1 << ADEN) | (1 << ADATE) | (1 << ADIE) | (5 << ADPS0);ADC ENABLED, FREE RUNNING, INTERRUPT ENABLED, PRESCALER
 	sts ADCSRA, temp
 
-	clr temp
-	out PORTC, temp  ;BLANK the LED bar
-	out PORTG, temp  ;BLANK the top LEDs on LED bar
-	
-	ldi temp, 0b00010000      ; set PORTE (pins 2&3) to output (Backlight = 2, Motor = 3)
-	out DDRE, temp
-
-	ser temp										; clear PORTH
-	out PORTE, temp	
-
-
 	rcall initialiseBacklightTimer  ;;code for the backlight timer
 	
 	clr r24
 	clr r25
-	clr r23
-	clr r22
+	clr curRound
+	clr keypadCode
 	clr screenStage		; initial screen (click left button to start)
 	clr counter
 	ldii running, 0 
 	ldi difficultyCount, 20
 
 	clear_datamem counterTimer
+	clear_datamem gameloopTimer
+	clear_datamem keypadTimer
+
 	do_lcd_write_str str_home_msg ;write home message to screen
+
 	sei
 	
 halt:
 	rjmp halt ;do nothing forever!
 
 Timer0OVF: ;This is an 8-bit timer - Game loop.
+	push yl
+	push yh
 	push temp
-	clr temp
-	addi r22, 1
-	adc r23, temp
+	lds yl, gameloopTimer
+	lds yh, gameloopTimer+1
+	adiw Y, 1
+	sts gameloopTimer, yl
+  	sts gameloopTimer+1, yh
 	ldi temp, high(781)
-	cpi r22, low(781)
-	cpc r23, temp
+	cpi yl, low(781)
+	cpc yh, temp
 	breq contTimer0
-	pop temp
-	reti
-	contTimer0:
-	clr r22
-	clr r23
+	rjmp endTimer0
 
-;createADCint
+	contTimer0:
+
+	clear_datamem gameloopTimer
 
 	cpii screenStage, stage_countdown
 	breq countdownSeg
@@ -245,27 +247,7 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	ldii running, 0 
 	do_lcd_write_str str_win_msg  
 	rjmp endTimer0
-	;Timer:
-;	in temp, SREG
-;	push temp 
-;	push r25
-;	push r24 
-;	adiw r25:r24, 1
-;	cpi r24, low(3906) 
-;	ldi temp, high(3906)
-;	cpc r25, temp
-;	brne endif
-;	
-;	com flash
-;	out PORTC, patlo
-;	clr r24
-;	clr r25
-;	endif:
-;	pop r24 
-;	pop r25 
-;;	pop temp
-;	out SREG, temp
-;	reti 
+
 	loseSeg:
 	ldii running, 0
 	toggle TIMSK1, 0
@@ -275,8 +257,9 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 
 	endTimer0:
 	pop temp
+	pop yh
+	pop yl
 	reti
-
 
 countdownFunc:
 	cpii screenStageFol, stage_countdown
@@ -355,11 +338,18 @@ potFindFunc:
 codeFindFunc:
 	cpii screenStageFol, stage_code_find
 	breq endcodeFindSeg
+
 	ldii screenStageFol, stage_code_find
 	do_lcd_write_str str_keypadscan_msg
 	lds temp, ADCSRA 
 	cbr temp, (ADSC + 1)   ;enable ADC
 	sts ADCSRA, temp      ;enable ADC
+	
+	andi cmask, 0b1111
+	mov keypadCode, cmask
+
+	clr counter	;clear counter to count timers the correct button was held
+
 	endcodeFindSeg:
 	ret
 	
@@ -377,7 +367,6 @@ Timer1OVF: ;This is a countdown timer (16-bit)
 	cpi yl, low(30)
 	cpc yh, temp
 	breq timer1Second
-
 	rjmp endTimer1		; fix for out of range branch
 
 	timer1Second:
@@ -531,6 +520,24 @@ Timer3OVF:									; interrupt subroutine timer 2
 	reti
 
 Timer2OVF: ;keypad loop
+	push yl
+	push yh
+	push temp
+
+	lds yl, keypadTimer
+	lds yh, keypadTimer+1
+	adiw Y, 1
+	sts keypadTimer, yl
+  	sts keypadTimer+1, yh
+	ldi temp, high(781)
+	cpi yl, low(781)
+	cpc yh, temp
+	breq contTimer2
+	rjmp endTimer2
+
+	contTimer2:
+
+	clear_datamem keypadTimer
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;KEYPAD LOGIC;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -538,7 +545,6 @@ Timer2OVF: ;keypad loop
 	push row
 	push rmask
 	push cmask
-	push temp
 	push temp2
 	clr col
 	clr row
@@ -549,7 +555,7 @@ Timer2OVF: ;keypad loop
 colloop:
 	cpi col, 4
 	brne contColloop; If all keys are scanned, repeat.
- 	jmp endTimer2
+ 	rjmp prologueTimer2
 	contColloop:
 	sts PORTL, cmask; Otherwise, scan a column.
 	ldi temp, 0xFF	; Slow down the scan operation.
@@ -574,84 +580,62 @@ rowloop:
 nextcol: ; if row scan is over
 	lsl cmask
 	inc col ; increase column value
-	jmp colloop
+	rjmp colloop
 convert:	
 ;	rcall backlightFadeIn			;;initialise the backlight to begin to fade in
-	;cpi col, 3 ; If the pressed key is in col.3 
-	;breq letters ; we have a letter
-				 ; If the key is not in col.3 and
-	;cpi row, 3 ; If the key is in row3,
-	;breq symbols; we have a symbol or 0
-	mov temp, row ; Otherwise we have a number in 1 -9
+	mov temp, row 
 	lsl temp
 	lsl temp
 	add temp, col ; temp = row*4 + col
-	;addi temp, '0'
-	;do_lcd_data temp
-	;subi temp, -'1'
 	cpii screenStage, stage_start
 	breq setDifficulty
-	rjmp comparecode
-;symbols:
-;	cpi col, 0 ; Check if we have a star
-;	breq star ;star
-;	cpi col, 1 ; or if we have zero
-;	breq zero
-;	ldi temp, '#'
-;	rjmp comparecode
-;star:
-;	ldi temp, '*'	;need to display this key too
-;	rjmp comparecode
-;zero:
-;	ldi temp, 0; Set to zero;
-;	rjmp comparecode
+	cpii screenStageFol, stage_code_find
+	breq compareCode
+
+	rjmp prologueTimer2
 setDifficulty:	
 	A:
 	cpi temp, 3 ;A
 	brne B
 	ldi difficultyCount, 20
-	rjmp endTimer2
+	rjmp prologueTimer2
 	B:
 	cpi temp, 7 ;B
 	brne C
 	ldi difficultyCount, 15
-	rjmp endTimer2
+	rjmp prologueTimer2
 	C:
 	cpi temp, 11 ;C
 	brne D
 	ldi difficultyCount, 10
-	rjmp endTimer2
+	rjmp prologueTimer2
 	D:	
 	cpi temp, 15 ;C	
-	brne endTimer2				
+	brne prologueTimer2				
 	ldi difficultyCount, 6
-	rjmp endTimer2	
+	rjmp prologueTimer2	
 
+compareCode:
 
-	;entercode:	;if not for difficulty
-	;ldi temp, 'A'
-	;add temp, row
-comparecode: 		;compare the letter pressed, if it is equal to the sequential letter of the next sequence proceed with the code 
-;	lds yl, counterTimer
-	;lds yh, counterTimer+1
-	
-	
-	;ldi ZL, LOW(randomcode)
-	;ldi ZH, HIGH(randomcode)
-;	lpm temp2, Z+
-;	cpse temp2, temp
-;	rjmp reenter
-;	ldi temp, '*'			
-;	do_lcd_data temp
-;	toggle TIMSK2, 1<<TOIE2
-;	ldii debounce, 1
-endTimer2:
+	cp temp, keypadCode
+	brne prologueTimer2
+	clr temp
+	ldi yl, low(randomcode)
+	ldi yh, high(randomcode)
+	add yl,	curRound
+	adc yh, temp          ;unless rounds exceeds 255....
+	st Y,  keypadCode
+
+prologueTimer2:
 	pop temp2
-	pop temp
 	pop cmask
 	pop rmask
 	pop row
 	pop col
+endTimer2:
+	pop temp
+	pop yh
+	pop yl
 	reti
 ;reenter:
 ;	clr temp 				;to reset if user enters wrong code
@@ -659,13 +643,7 @@ endTimer2:
 ;	rjmp endTimer2
 	
 EXT_INT_R:
-	;;;;HOW TO USE PUSH BUTTONS:
-	;cpii debounce, 1
-	;brne endInt
-	;clr debounce
-	;;;;DO STUFF HERE
-	;toggle TIMSK2, 1<<TOIE2
-	;endInt:
+	rjmp RESET
 	reti
 
 EXT_INT_L:
