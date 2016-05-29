@@ -574,7 +574,7 @@ Timer2OVF: ;keypad loop
 colloop:
 	cpi col, 4
 	brne contColloop; If all keys are scanned, repeat.
-
+	
 	;check if in findCode
 	cpii screenStageFol, stage_code_find
 	breq motorKill
@@ -617,7 +617,13 @@ convert:
 	lsl temp
 	lsl temp
 	add temp, col ; temp = row*4 + col
-
+	
+	cpii screenStage, stage_win
+	breq RESET
+	
+	cpiiscreenStage, stage_lose
+	breq RESET
+	
 	cpii screenStage, stage_start
 	breq setDifficulty
 
@@ -773,9 +779,14 @@ EXT_INT_L:
 	rjmp preEndInt
 	checkStageWin:
 	cpii screenStage, stage_win
+	brne checkStageLose
+	;ldii screenStage, stage_start
+	;toggle PORTE, _______
+	rjmp RESET
+	checkStageLose:
+	cpii screenStage, stage_lose
+	rjmp RESET
 	brne preEndInt
-	ldii screenStage, stage_start
-	preEndInt:
 	;toggle TIMSK, 1<<TOIE2
 	;endIntL:
 	reti
