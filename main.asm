@@ -1,7 +1,9 @@
 ;;;;;;;;;;;;; TO DO ;;;;;;;;
 ; Get Keypad done, then implement rcall backlightFadeIn after we detect precense in the keypad
 ;
-; 'RESET POT' doesn't last 500ms, neither does the FIND POT hold for 1000ms
+; Implement Sound
+;
+; Implement Strobe on win
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 .include "m2560def.inc"
@@ -16,8 +18,8 @@
 .equ max_num_rounds		= 1
 .equ counter_initial	= 3
 .equ counter_find_pot	= 20
-.equ pot_pos_min		= 35 ; our min value on the POT is 21
-.equ pot_pos_max		= 980
+.equ pot_pos_min		= 22 ; our min value on the POT is 21
+.equ pot_pos_max		= 1004
 .equ stage_start		= 0
 .equ stage_countdown	= 1
 .equ stage_pot_reset	= 2
@@ -42,7 +44,7 @@
 .def keypadCode			= r22
 .def curRound			= r23
 .def difficultyCount	= r24
-
+;;;;;;;;;;;;DESEG VARIABLES;;;;;;;;;;;;
 .dseg
 gameloopTimer:			.byte 2	; counts number of timer overflows for gameloop
 counterTimer: 			.byte 2	; counts number of timer overflows for counter
@@ -53,7 +55,7 @@ BacklightSeconds: 		.byte 1	; counts number of seconds to trigger backlight fade
 BacklightFadeCounter: 	.byte 1 ; used to pace the fade in process
 BacklightFade: 			.byte 1 ; flag indicating current backlight process - stable/fade in/fade out
 BacklightPWM: 			.byte 1 ; current backlight brightness
-
+;;;;;;;;;;;;VECTOR TABLE;;;;;;;;;;;;;;
 .cseg
 ;.org 0x0
 	jmp RESET
@@ -71,8 +73,8 @@ BacklightPWM: 			.byte 1 ; current backlight brightness
 	jmp Timer3OVF	;keypad search code
 .org 0x3A
 	jmp handleADC
-
-.org 0x70 ;STRING LIST:  (1 denotes a new line, 0 denotes end of second line)
+;;;;;;;;;;;;STRING LIST;;;;;;;;;;;;;;
+.org 0x70 ;(1 denotes a new line, 0 denotes end of second line)
 str_home_msg: 			.db 	"2121 16s1", 		1, 		"Safe Cracker", 	0
 str_keypadscan_msg: 	.db 	"Position found!",	1, 		"Scan for number", 	0
 str_findposition_msg: 	.db 	"Find POT POS", 	1, 		"Remaining: ", 		0
@@ -288,9 +290,11 @@ potResetFunc:
 		ret
 		incRESETpotCount:
 			inc col ;numbers of times you have seen row as 1
-			ldi temp, 100
-			cpse col, temp
+			ldi temp, 5
+			cp col, temp
+			brne endincRESETpotCount
 			ldii screenStage, stage_pot_find
+			endincRESETpotCount:
 	ret
 
 potFindFunc:
@@ -326,8 +330,11 @@ potFindFunc:
 		ret
 		incFINDpotCount:
 			inc col ;numbers of times you have seen row as 1
-			cpi col, 10
+			ldi temp, 10
+			cp col, temp
+			brne endincFINDpotCount
 			ldii screenStage, stage_code_find
+			endincFINDpotCount:
 	ret
 
 codeFindFunc:
@@ -908,4 +915,3 @@ asciiconv:				;no need for ascii convert as digits show up as '*' (we need this 
 ;;;;;;;LEAVE THIS HERE - NEEDS TO BE INCLUDED LAST!!!;;;;;;;
 .include "backlight.asm"
 .include "LCD.asm"
-
