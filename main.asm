@@ -246,6 +246,11 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	winSeg:
 	ldii running, 0 
 	do_lcd_write_str str_win_msg  
+	;winloop:
+	;toggle PORTE, 00000100
+	;rcall sleep_500ms
+	;toggle PORTE, 00000100
+	;rjmp winloop:
 	rjmp endTimer0
 
 	loseSeg:
