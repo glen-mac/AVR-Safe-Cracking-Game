@@ -25,7 +25,7 @@
 .equ INITCOLMASK		= 0xEF ; scan from the rightmost column,
 .equ INITROWMASK		= 0x01 ; scan from the top row
 .equ ROWMASK			= 0x0F
-.equ max_num_rounds		= 1
+.equ max_num_rounds		= 10
 .equ counter_initial	= 3
 .equ counter_find_pot	= 20
 .equ pot_pos_min		= 35 ; our min value on the POT is 21
@@ -55,15 +55,15 @@
 .def difficultyCount	= r24
 
 .dseg
-gameloopTimer: 			.byte 2		; counts number of timer overflows for gameloop
-counterTimer: 			.byte 2		; counts number of timer overflows for counter
-keypadTimer: 			.byte 2		; counts number of timer overflows for keypad
-randomcode: 			.byte max_num_rounds		; stores the 3 'random' keypad items
-BacklightCounter: 		.byte 2 	; counts timer overflows
-BacklightSeconds: 		.byte 1		; counts number of seconds to trigger backlight fade out
-BacklightFadeCounter: 	.byte 1 	; used to pace the fade in process
-BacklightFade: 			.byte 1 	; flag indicating current backlight process - stable/fade in/fade out
-BacklightPWM: 			.byte 1 	; current backlight brightness
+gameloopTimer:			.byte 2	; counts number of timer overflows for gameloop
+counterTimer: 			.byte 2	; counts number of timer overflows for counter
+keypadTimer: 			.byte 2	; counts number of timer overflows for keypad
+randomcode: 			.byte max_num_rounds; stores the 3 'random' keypad items
+BacklightCounter: 		.byte 2 ; counts timer overflows
+BacklightSeconds: 		.byte 1	; counts number of seconds to trigger backlight fade out
+BacklightFadeCounter: 	.byte 1 ; used to pace the fade in process
+BacklightFade: 			.byte 1 ; flag indicating current backlight process - stable/fade in/fade out
+BacklightPWM: 			.byte 1 ; current backlight brightness
 
 .cseg
 ;.org 0x0
@@ -84,14 +84,14 @@ BacklightPWM: 			.byte 1 	; current backlight brightness
 	jmp handleADC
 
 .org 0x70 ;STRING LIST:  (1 denotes a new line, 0 denotes end of second line)
-str_home_msg: .db "2121 16s1", 1, "Safe Cracker", 0
-str_keypadscan_msg: .db "Position found!", 1, "Scan for number", 0
-str_findposition_msg: .db "Find POT POS", 1, "Remaining: ", 0
-str_timeout_msg: .db "Game over", 1, "You Lose!", 0 
-str_win_msg: .db "Game complete", 1, "You Win!", 0 
-str_reset_msg: .db "Reset POT to 0", 1, "Remaining ", 0
-str_countdown_msg: .db "2121 16s1", 1, "Starting in ", 0
-str_entercode_msg: .db "Enter Code", 1, 0
+str_home_msg: 			.db 	"2121 16s1", 		1, 		"Safe Cracker", 	0
+str_keypadscan_msg: 	.db 	"Position found!",	1, 		"Scan for number", 	0
+str_findposition_msg: 	.db 	"Find POT POS", 	1, 		"Remaining: ", 		0
+str_timeout_msg:		.db 	"Game over", 		1, 		"You Lose!", 		0 
+str_win_msg: 			.db 	"Game complete", 	1, 		"You Win!", 		0 
+str_reset_msg:			.db 	"Reset POT to 0", 	1, 		"Remaining ", 		0
+str_countdown_msg: 		.db 	"2121 16s1", 		1, 		"Starting in ", 	0
+str_entercode_msg: 		.db 	"Enter Code", 		1, 							0
 	
 RESET:
 	;;;;;;;;prepare STACK;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -304,7 +304,7 @@ potResetFunc:
 		ret
 		incRESETpotCount:
 			inc col ;numbers of times you have seen row as 1
-			cpi col, 5
+			cpi col, 50
 			ldii screenStage, stage_pot_find
 	ret
 
@@ -312,6 +312,9 @@ potFindFunc:
 	cpii screenStageFol, stage_pot_find
 	breq endpotFindSeg
 	do_lcd_write_str str_findposition_msg ;this is the reset pot message?
+	mov temp, difficultyCount
+	sub temp, counter
+	rcall asciiconv
 	ldii screenStageFol, stage_pot_find
 	pickRandPotVal:
 	lds cmask, TCNT1L	    ; this register used to hold LOW 8 bits of RAND number
@@ -353,8 +356,8 @@ codeFindFunc:
 	cbr temp, (ADSC + 1)   ;enable ADC
 	sts ADCSRA, temp      ;enable ADC
 	
-	andi cmask, 0b1111
-	mov keypadCode, cmask
+	lds keypadCode, TCNT3L
+	andi keypadCode, 0b1111
 
 	clr counter	;clear counter to count timers the correct button was held
 
@@ -669,6 +672,7 @@ keypadCodeEnter:
 
 	cp temp, temp2
 	breq correctKey
+	clr counter
 	do_lcd_write_str str_entercode_msg
 	rjmp prologueTimer2
 
