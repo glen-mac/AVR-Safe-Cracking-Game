@@ -26,7 +26,8 @@
 .equ ROWMASK = 0x0F
 .equ counter_initial = 3
 .equ counter_find_pot = 20
-.equ pot_pos_reset = 22 ; our min value on the POT is 21
+.equ pot_pos_min = 35 ; our min value on the POT is 21
+.equ pot_pos_max = 980
 .equ stage_start = 0
 .equ stage_countdown = 1
 .equ stage_pot_reset = 2
@@ -151,6 +152,7 @@ RESET:
 
 	clr temp
 	out PORTC, temp ;BLANK the LED bar
+	out PORTG, temp
 	
 ;	rcall initialiseBacklightTimer  ;;code for the backlight timer
 	
@@ -300,7 +302,25 @@ potFindFunc:
 	breq endpotFindSeg
 	do_lcd_write_str str_findposition_msg ;this is the reset pot message?
 	ldii screenStageFol, stage_pot_find
-	clr row 				; this register used to ensure FIND position is helf for 500ms
+	pickRandPotVal:
+	lds cmask, TCNT1L	    ; this register used to hold LOW 8 bits of RAND number
+	lds rmask, TCNT1H       ; this register used to hold HIGH bits of RAND number
+	andi rmask, 0b11
+	
+	ldi temp, high(pot_pos_max)
+	cpi cmask, low(pot_pos_max)
+	cpc rmask, temp
+	brsh pickRandPotVal
+
+	ldi temp, high(pot_pos_min)
+	cpi cmask, low(pot_pos_min)
+	cpc rmask, temp
+	brlo pickRandPotVal
+
+	;ldi cmask, low(480)
+	;ldi rmask, high(480)
+
+	clr row 			    ; this register used to ensure FIND position is helf for 500ms
 	clr col					; this register used to counter amount of times row has been seen to
 							; be one (obviously after checking twice in 500ms intervals it is FOUND)
 	endpotFindSeg:
@@ -446,7 +466,7 @@ Timer1OVF: ;This is a countdown timer (16-bit)
 		ldi temp, 20
 		sub temp, counter
 		cpi temp, 0
-		brne countPotReset
+		brne contPotResetFind
 		ldii screenStage, stage_lose			; change to POT timeout
 		rjmp endTimer1
 		contPotResetFind:			;continues the countPotRestFind code
@@ -455,7 +475,7 @@ Timer1OVF: ;This is a countdown timer (16-bit)
 				do_lcd_write_str str_findposition_msg
 				rjmp Timer1prologue
 			countPotReset:
-				;do_lcd_write_str str_reset_msg
+				do_lcd_write_str str_reset_msg
 				rjmp Timer1prologue
 
 	Timer1prologue:
@@ -633,38 +653,102 @@ EXT_INT_L:
 
 handleADC:
 	push temp
+	push rmask
+	push cmask
 	push temp2
-	push r20
-	lds r20, ADCL 
-	out PORTC, r20
-	lds temp, ADCH
-	out PORTG, temp
 
-	cpii screenStage, stage_pot_reset
-	brne endHandleADC
-	ldi temp2, high(pot_pos_reset)
-	cpi r20, low(pot_pos_reset)
-	cpc temp, temp2
-	brge clrRowPreEndADC
-	ldi row, 1		; this means that RESET is being held
-	rjmp endHandleADC
-	clrRowPreEndADC:
-	clr row
-	rjmp endHandleADC
+	lds temp2, ADCL 
+	;out PORTC, temp2
+  	lds temp, ADCH
+	;out PORTG, temp
 
+	cpii screenStageFol, stage_pot_reset
+		brne checkIfPotFind
+		ldi rmask, high(pot_pos_min)
+		cpi temp2, low(pot_pos_min)
+		cpc temp, rmask
+		brge clrRowPreEndADC
+		ldi row, 1		; this means that RESET is being held
+		rjmp endHandleADC
+		clrRowPreEndADC:
+			clr row
+			rjmp endHandleADC
 
+	checkIfPotFind:
+
+	cpii screenStageFol, stage_pot_find  ;cmask is LOW bits, rmask is HIGH bits
+		breq performPotFind
+		rjmp endHandleADC
+
+		performPotFind:
+
+		cp temp2, cmask
+		cpc temp, rmask
+		brlo adcIsLower
+		rjmp adcIsHigher
+		adcIsLower:	
+			sub cmask, temp2
+			sbc rmask, temp	
+			rjmp checkBelow16
+		adcIsHigher:
+			sub temp2, cmask
+			sbc temp, rmask
+			mov cmask, temp2
+			mov rmask, temp
+		checkBelow16:
+			ldi temp, high(17)
+			cpi cmask, low(17)
+			cpc rmask, temp
+			brsh checkBelow32
+			ldi temp2, 0xFF
+			ldi temp, 0b11	;for LED
+			ldi row, 1		; this means that POSITION is being held
+			rjmp endCheckIfPotFind
+		checkBelow32:
+			clr row			; clear flag (which says we are within 16 ADC)
+			ldi temp, high(33)
+			cpi cmask, low(33)
+			cpc rmask, temp
+			brsh checkBelow48
+			ldi temp2, 0xFF
+			ldi temp, 0b01
+			rjmp endCheckIfPotFind
+		checkBelow48:
+			ldi temp, high(49)
+			cpi cmask, low(49)
+			cpc rmask, temp
+			brsh notWithinAnyBounds
+			ldi temp2, 0xFF
+			ldi temp, 0b00
+			rjmp endCheckIfPotFind
+		notWithinAnyBounds:
+			clr temp	    ;clear these values, as the LED values will be placed in them 
+			clr temp2			;but they will remain blank in for within the set bounds
+		endCheckIfPotFind:
+			out PORTC, temp2
+			out PORTG, temp
+			rjmp endHandleADC	
 	endHandleADC:
-	pop r20
 	pop temp2
+	pop cmask
+	pop rmask
 	pop temp
 	reti
 
 asciiconv:				;no need for ascii convert as digits show up as '*' (we need this for count down)
+	push r17
 	push r18
 	push r19
 	push temp
 	clr r18
 	clr r19
+	clr r17
+  	numhundreds:
+ 	cpi temp, 100
+ 	brlo numtens ;branch if lower due to unsigned
+ 	inc r17
+ 	subi temp, 100
+ 	rjmp numhundreds
 	numtens:
 	cpi temp, 10
 	brlo numones ;branch if lower due to unsigned
@@ -674,6 +758,9 @@ asciiconv:				;no need for ascii convert as digits show up as '*' (we need this 
 	numones:
 	mov r18, temp
 	ldi temp, '0'
+	addi r17, '0'
+ 	cpse r17, temp
+ 	do_lcd_data r17
 	addi r19, '0'
 	do_lcd_data r19
 	addi r18, '0'
@@ -681,6 +768,7 @@ asciiconv:				;no need for ascii convert as digits show up as '*' (we need this 
 	pop temp
 	pop r19
 	pop r18
+	pop r17
 	ret
 
 ;;;;;;;LEAVE THIS HERE - NEEDS TO BE INCLUDED LAST!!!;;;;;;;
