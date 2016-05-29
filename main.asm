@@ -201,27 +201,27 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	rjmp endTimer0
 	
 	countdownSeg:
-	;ldii running, 1
+	ldii running, 1
 	rcall countdownFunc
 	rjmp endTimer0
 
 	potResetSeg:
-	;ldii running, 1 
+	ldii running, 1 
 	rcall potResetFunc
 	rjmp endTimer0
 
 	potFindSeg:
-	;ldii running, 1 
+	ldii running, 1 
 	rcall potFindFunc
 	rjmp endTimer0
 
 	codeFindSeg:
-	;ldii running, 1 
+	ldii running, 1 
 	rcall codeFindFunc
 	rjmp endTimer0
 
 	codeEnterSeg:
-	;ldii running, 1 
+	ldii running, 1 
 	rcall codeEnterFunc
 	rjmp endTimer0
 
@@ -229,13 +229,13 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	cpii screenStageFol, stage_win
 	breq endwinSeg
 	ldii screenStageFol, stage_win
-	;ldii running, 0 
+	ldii running, 0 
 	do_lcd_write_str str_win_msg  
 	endwinSeg:
 	rjmp endTimer0
 
 	loseSeg:
-	;ldii running, 0
+	ldii running, 0
 	toggle TIMSK1, 0
 	toggle TIMSK0,0
 	do_lcd_write_str str_timeout_msg
@@ -595,7 +595,7 @@ nextcol: ; if row scan is over
 	inc col ; increase column value
 	rjmp colloop
 convert:	
-;	rcall backlightFadeIn			;;initialise the backlight to begin to fade in
+	rcall backlightFadeIn			;;initialise the backlight to begin to fade in
 	mov temp, row 
 	lsl temp
 	lsl temp
