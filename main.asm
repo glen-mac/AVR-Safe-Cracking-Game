@@ -33,8 +33,6 @@
 .def counter			= r5	; a generic countdown register
 .def running			= r6	; a flag represeting if the backlight should be on indefinitely on the current screen
 .def keyButtonPressed	= r7	; an internal debounce flag for the keypad
-.def difficultyNum1		= r8
-.def difficultyNum2		= r9
 .def row				= r16 	; keypad current row number
 .def col				= r17 	; keypad current column number
 .def rmask				= r18 	; keypad mask for current row during scan
