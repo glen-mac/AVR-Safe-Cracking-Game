@@ -21,9 +21,58 @@
 ; Send a command to the LCD (r16)
 ;
 
+lcd_store_custom:
+	push temp
+	push row
+	push col
+	push rmask
+
+	clr col
+
+	lcdStoreLoop:
+
+	ldi temp, (0b01 << 6)
+	mov row, col
+	mov rmask, temp2
+
+	andi rmask, 0b111
+
+	lsl rmask
+	lsl rmask
+	lsl rmask
+
+	andi row, 0b111
+	or rmask, row
+	or temp, rmask
+
+;	ldi temp, 0b01001000
+
+	rcall lcd_set_pos
+
+	lpm temp, Z+
+	andi temp, 0b00011111
+
+	;ldi temp, 0b11101010
+
+	rcall lcd_set_dat
+
+	inc col
+
+	cpi col, 7
+	brne lcdStoreLoop
+	;do_lcd_command 0b10000000	
+
+	pop rmask
+	pop col
+	pop row
+	pop temp
+
+
+	ret
+
 
 lcd_set_pos:
-	out PORTF, r16
+	out PORTF, temp
 	lcd_clr LCD_RS
 	rcall sleep_1ms
 	lcd_set LCD_E
@@ -35,7 +84,7 @@ lcd_set_pos:
 	ret
 
 lcd_set_dat:
-	out PORTF, r16
+	out PORTF, temp
 	lcd_clr LCD_RS
 	rcall sleep_1ms
 	lcd_set LCD_RS
@@ -49,15 +98,18 @@ lcd_set_dat:
 	ret
 
 lcd_command:
+	push r16
 	out PORTF, r16
 	rcall sleep_1ms
 	lcd_set LCD_E
 	rcall sleep_1ms
 	lcd_clr LCD_E
 	rcall sleep_1ms
+	pop r16
 	ret
 
 lcd_data:
+	push r16
 	out PORTF, r16
 	lcd_set LCD_RS
 	rcall sleep_1ms
@@ -66,6 +118,7 @@ lcd_data:
 	lcd_clr LCD_E
 	rcall sleep_1ms
 	lcd_clr LCD_RS
+	pop r16
 	ret
 
 lcd_wait:

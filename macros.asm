@@ -32,15 +32,30 @@
 	do_lcd_data r16
 .endmacro
 
-
-.macro do_lcd_set_pos
-	ldi r16, @0
-	rcall lcd_set_pos
+.macro disable_ADC
+	lds temp, ADCSRA 
+	cbr temp, (ADSC + 1)   ;disable ADC
+	sts ADCSRA, temp      ;disable ADC
 .endmacro
 
-.macro do_lcd_set_dat
-	ldi r16, @0
-	rcall lcd_set_dat
+.macro do_lcd_store_custom
+	push zl
+	push zh
+	push temp2
+	ldi zl, low(@1<<1)
+	ldi zh, high(@1<<1)
+	ldi temp2, @0
+	rcall lcd_store_custom
+	pop temp2
+	pop zh
+	pop zl
+.endmacro
+
+.macro do_lcd_show_custom
+	do_lcd_command 0b10001110
+	do_lcd_data_i @0
+	do_lcd_command 0b10001111
+	do_lcd_data_i @1
 .endmacro
 
 ; Pass this macro a register, and it will put

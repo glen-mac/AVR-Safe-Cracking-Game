@@ -33,6 +33,8 @@
 .def counter			= r5	; a generic countdown register
 .def running			= r6	; a flag represeting if the backlight should be on indefinitely on the current screen
 .def keyButtonPressed	= r7	; an internal debounce flag for the keypad
+.def difficultyNum1		= r8
+.def difficultyNum2		= r9
 .def row				= r16 	; keypad current row number
 .def col				= r17 	; keypad current column number
 .def rmask				= r18 	; keypad mask for current row during scan
@@ -79,14 +81,21 @@ finishedBeepCounter: .byte 2 					; number of loops so far in a beep
 	jmp handleADC	; ADC complete reading
 ;;;;;;;;;;;;STRING LIST;;;;;;;;;;;;;;
 .org 0x70 ;(1 denotes a new line, 0 denotes end of second line)
-str_home_msg: 			.db 	"2121 16s1", 		1, 		"Safe Cracker", 	0
+str_home_msg: 			.db 	"2121 16s1", 		1, 		"Safe Cracker",0, 	0
 str_keypadscan_msg: 	.db 	"Position found!",	1, 		"Scan for number", 	0
-str_findposition_msg: 	.db 	"Find POT POS", 	1, 		"Remaining: ", 		0
+str_findposition_msg: 	.db 	"Find POT POS", 	1, 		"Remaining: ",0, 	0
 str_timeout_msg:		.db 	"Game over", 		1, 		"You Lose!", 		0 
-str_win_msg: 			.db 	"Game complete", 	1, 		"You Win!", 		0 
+str_win_msg: 			.db 	"Game complete", 	1, 		"You Win!",0, 		0 
 str_reset_msg:			.db 	"Reset POT to 0", 	1, 		"Remaining ", 		0
-str_countdown_msg: 		.db 	"2121 16s1", 		1, 		"Starting in ", 	0
+str_countdown_msg: 		.db 	"2121 16s1", 		1, 		"Starting in ",0, 	0
 str_entercode_msg: 		.db 	"Enter Code", 		1, 							0
+lcd_char_smiley: 		.db		0x00, 0x00, 0x0A, 0x00, 0x11, 0x0E, 0x00, 0x00
+lcd_char_two: 			.db		0x0E, 0x02, 0x04, 0x0F, 0x00, 0x00, 0x00, 0x00
+lcd_char_one: 			.db		0x0C, 0x04, 0x04, 0x0E, 0x00, 0x00, 0x00, 0x00
+lcd_char_five: 			.db		0x0E, 0x08, 0x06, 0x0E, 0x00, 0x00, 0x00, 0x00
+lcd_char_six: 			.db		0x0E, 0x08, 0x0E, 0x0E, 0x00, 0x00, 0x00, 0x00
+lcd_char_zero: 			.db		0x0E, 0x0A, 0x0A, 0x0E, 0x00, 0x00, 0x00, 0x00
+
 	
 RESET:
 	;;;;;;;;prepare STACK;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -98,36 +107,15 @@ RESET:
 	ser r16
 	out DDRF, r16 
 	out DDRA, r16 
+	do_lcd_store_custom 	0,	lcd_char_zero
+	do_lcd_store_custom 	1,	lcd_char_one
+	do_lcd_store_custom 	2,	lcd_char_two
+	do_lcd_store_custom 	3,	lcd_char_smiley
+	do_lcd_store_custom 	5,	lcd_char_five
+	do_lcd_store_custom 	6,	lcd_char_six
 	clr r16
 	out PORTF, r16
 	out PORTA, r16
-
-
-
-do_lcd_set_pos 0b01001000
-do_lcd_set_dat 0b11101010
-
-do_lcd_set_pos 0b01001001
-do_lcd_set_dat 0b11100000
-
-do_lcd_set_pos 0b01001010
-do_lcd_set_dat 0b11110001
-
-do_lcd_set_pos 0b01001011
-do_lcd_set_dat 0b11101110
-
-do_lcd_set_pos 0b01001100
-do_lcd_set_dat 0b11100000
-
-do_lcd_set_pos 0b01001101
-do_lcd_set_dat 0b11100000
-
-do_lcd_set_pos 0b01001110
-do_lcd_set_dat 0b11100000
-
-do_lcd_set_pos 0b01001111
-do_lcd_set_dat 0b11100000
-
 	do_lcd_command 0b00111000 ; 2x5x7
 	do_lcd_command 0b00001000 ; display off
 	do_lcd_command 0b00000001 ; clear display
@@ -192,10 +180,7 @@ do_lcd_set_dat 0b11100000
 
 	do_lcd_write_str str_home_msg ;write home message to screen
 
-	do_lcd_data_i 0b00000001
-
-
-
+	do_lcd_show_custom 2, 0
 
 	sei
 	
@@ -238,45 +223,33 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	breq loseSeg
 
 	rjmp endTimer0
-	
+
 	countdownSeg:
-	ldii running, 1
 	rcall countdownFunc
 	rjmp endTimer0
 
 	potResetSeg:
-	ldii running, 1 
 	rcall potResetFunc
 	rjmp endTimer0
 
 	potFindSeg:
-	ldii running, 1 
 	rcall potFindFunc
 	rjmp endTimer0
 
 	codeFindSeg:
-	ldii running, 1 
 	rcall codeFindFunc
 	rjmp endTimer0
 
 	codeEnterSeg:
-	ldii running, 1 
 	rcall codeEnterFunc
 	rjmp endTimer0
 
 	winSeg:
-	ldii running, 0
-	toggle TIMSK1, 0
-	toggle TIMSK0, 0
-	do_lcd_write_str str_win_msg
 	rcall winFunc
 	rjmp endTimer0
 
 	loseSeg:
-	ldii running, 0
-	toggle TIMSK1, 0
-	toggle TIMSK0,0
-	do_lcd_write_str str_timeout_msg
+	rcall loseFunc
 	rjmp endTimer0
 
 	endTimer0:
@@ -288,6 +261,7 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 countdownFunc:
 	cpii screenStageFol, stage_countdown
 	breq endcountdownSeg
+	ldii running, 1
 	do_lcd_write_str str_countdown_msg
 	ldi temp, 3
 	addi temp, '0'
@@ -303,6 +277,7 @@ countdownFunc:
 potResetFunc:
 	cpii screenStageFol, stage_pot_reset
 	breq endpotResetSeg
+	ldii running, 1 
 	do_lcd_write_str str_reset_msg ;this is the reset pot message?
 	mov temp, difficultyCount
 	sub temp, counter
@@ -331,6 +306,7 @@ potResetFunc:
 potFindFunc:
 	cpii screenStageFol, stage_pot_find
 	breq endpotFindSeg
+	ldii running, 1 
 	do_lcd_write_str str_findposition_msg ;this is the reset pot message?
 	mov temp, difficultyCount
 	sub temp, counter
@@ -371,13 +347,12 @@ potFindFunc:
 codeFindFunc:
 	cpii screenStageFol, stage_code_find
 	breq endcodeFindSeg
-
+	ldii running, 1 
 	toggle TIMSK1, 0 ;disable countdown
 	ldii screenStageFol, stage_code_find
 	do_lcd_write_str str_keypadscan_msg
-	lds temp, ADCSRA 
-	cbr temp, (ADSC + 1)   ;enable ADC
-	sts ADCSRA, temp      ;enable ADC
+
+	disable_ADC
 	
 	lds keypadCode, TCNT3L
 	andi keypadCode, 0b1111
@@ -390,7 +365,7 @@ codeFindFunc:
 codeEnterFunc:
 	cpii screenStageFol, stage_code_enter
 	breq endcodeEnterSeg
-
+	ldii running, 1 
 	ldii screenStageFol, stage_code_enter
 	do_lcd_write_str str_entercode_msg
 
@@ -400,14 +375,36 @@ codeEnterFunc:
 	ret
 	
 winFunc:
-	;cpii screenStageFol, stage_win
-	;breq endwinSeg
-	;ldii screenStageFol, stage_win
-	;do_lcd_write_str str_win_msg 
-	winloop:
-	toggleStrobe
-	rcall sleep_500ms
-	rjmp winloop 
+	cpii screenStageFol, stage_win
+	breq prologuewinSeg
+	ldii screenStageFol, stage_win
+	;ldii running, 0
+	toggle TIMSK1, 0
+
+	do_lcd_write_str str_win_msg
+	clr counter
+
+	prologuewinSeg:
+		ldii running, 0
+		inc counter
+		cpii counter, 5
+		brne endwinSeg
+		toggleStrobe
+		clr counter
+
+	endwinSeg: 
+
+	ret
+
+loseFunc:
+	ldii running, 0
+	toggle TIMSK1, 0
+	toggle TIMSK0,0
+	disable_ADC
+	ldi temp, 0
+	out PORTC, temp
+	out PORTG, temp
+	do_lcd_write_str str_timeout_msg
 	ret
 
 Timer1OVF: ;This is a countdown timer (16-bit)
@@ -672,29 +669,35 @@ convert:
 
 	checkIfCodeEnter:
 	cpii screenStageFol, stage_code_enter
-	breq keypadCodeEnter
+	brne endConvert
+	rjmp keypadCodeEnter
 
+	endConvert:
 	rjmp prologueTimer2
 setDifficulty:	
 	A:
 	cpi temp, 3 ;A
 	brne B
 	ldi difficultyCount, 20
+	do_lcd_show_custom 2, 0
 	rjmp prologueTimer2
 	B:
 	cpi temp, 7 ;B
 	brne C
 	ldi difficultyCount, 15
+	do_lcd_show_custom 1, 5
 	rjmp prologueTimer2
 	C:
 	cpi temp, 11 ;C
 	brne D
 	ldi difficultyCount, 10
+	do_lcd_show_custom 1, 0
 	rjmp prologueTimer2
 	D:	
 	cpi temp, 15 ;D	
 	brne performJMPtimer2End				
 	ldi difficultyCount, 6
+	do_lcd_show_custom  0, 6
 
 	performJMPtimer2End:
 	rjmp prologueTimer2	
