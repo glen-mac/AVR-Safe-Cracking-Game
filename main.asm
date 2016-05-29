@@ -466,8 +466,6 @@ Timer3OVF:									; interrupt subroutine timer 2
 			rjmp FadeFinished
 
 	FadeOut:
-		cpii running, 1						; check if game is in one of the running stages 
-		breq timer3Epilogue 
 		lds temp2, BacklightPWM				; if fading out
 		cpi temp2, 0x00						; check if min brightness
 		breq lcdBacklightMin
@@ -508,6 +506,8 @@ Timer3OVF:									; interrupt subroutine timer 2
 	brne timer3Epilogue
 	clr temp							
 	sts BacklightSeconds, temp					; reset the seconds
+	cpii running, 1						; check if game is in one of the running stages 
+	breq timer3Epilogue 
 	fadeOutBacklight:						; start fading out the backlight
 		rcall backlightFadeOut
 	
