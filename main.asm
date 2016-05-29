@@ -775,9 +775,14 @@ EXT_INT_L:
 	rjmp preEndInt
 	checkStageWin:
 	cpii screenStage, stage_win
+	brne checkStageLose
+	;ldii screenStage, stage_start
+	;toggle PORTE, _______
+	rjmp RESET
+	checkStageLose:
+	cpii screenStage, stage_lose
+	rjmp RESET
 	brne preEndInt
-	ldii screenStage, stage_start
-	preEndInt:
 	;toggle TIMSK, 1<<TOIE2
 	;endIntL:
 	reti
