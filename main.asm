@@ -16,7 +16,6 @@
 
 .include "m2560def.inc"
 .include "macros.asm"
-;.include "backlight.asm"
 
 ;;;;;;;;;;;;CONSTANTS;;;;;;;;;;;;;;;;;;;
 .equ debDELAY = 800 	;Variable debounce delay
@@ -328,9 +327,6 @@ potFindFunc:
 	cpi cmask, low(pot_pos_min)
 	cpc rmask, temp
 	brlo pickRandPotVal
-
-	;ldi cmask, low(480)
-	;ldi rmask, high(480)
 
 	clr row 			    ; this register used to ensure FIND position is helf for 500ms
 	clr col					; this register used to counter amount of times row has been seen to
@@ -774,4 +770,6 @@ asciiconv:				;no need for ascii convert as digits show up as '*' (we need this 
 	ret
 
 ;;;;;;;LEAVE THIS HERE - NEEDS TO BE INCLUDED LAST!!!;;;;;;;
+.include "backlight.asm"
 .include "LCD.asm"
+
