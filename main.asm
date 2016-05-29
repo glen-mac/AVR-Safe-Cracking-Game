@@ -143,12 +143,12 @@ RESET:
 	;;;;;;;;prepare MISC;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   	ldi temp, PORTLDIR 	;KEYPAD
 	sts DDRL, temp
-	ldi temp, 0b00010000  ; set PORTE (pins 2&3) to output (Backlight = 2, Motor = 3)
+	ldi temp, 0xFF;0b0001111  ; set PORTE (pins 3&4) to output (Backlight = 4, Motor = 3)
 	out DDRE, temp
 	ldi temp, 0xFF
 	out DDRC, temp	;PORTC is for LED bar
 	out DDRG, temp	;PORTG is for LED bar (top 2 LEDs)
-	ser temp										; clear PORTH
+	ldi temp, 0b00010000	;	pin position 3 is motor, 4 is LCD									
 	out PORTE, temp	
 	clr temp
 	out PORTC, temp  ;BLANK the LED bar
