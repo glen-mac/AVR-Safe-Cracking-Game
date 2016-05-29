@@ -226,12 +226,7 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	rjmp endTimer0
 
 	winSeg:
-	cpii screenStageFol, stage_win
-	breq endwinSeg
-	ldii screenStageFol, stage_win
-	ldii running, 0 
-	do_lcd_write_str str_win_msg  
-	endwinSeg:
+	rcall winFunc
 	rjmp endTimer0
 
 	loseSeg:
@@ -360,6 +355,14 @@ codeEnterFunc:
 	endcodeEnterSeg:
 	ret
 	
+winFunc:
+	cpii screenStageFol, stage_win
+	breq endwinSeg
+	ldii screenStageFol, stage_win
+	ldii running, 0 
+	do_lcd_write_str str_win_msg  
+	endwinSeg:
+	ret
 
 Timer1OVF: ;This is a countdown timer (16-bit)
 	push yl
