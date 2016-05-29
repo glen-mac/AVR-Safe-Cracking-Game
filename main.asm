@@ -40,7 +40,7 @@
 .def screenStage = r3	; current stage the game is on
 .def screenStageFol = r4; a backlog of screenstage
 .def counter = r5		; a countdown variable
-.def running = r6
+.def running = r6		
 .def row = r16 			; current row number
 .def col = r17 			; current column number
 .def rmask = r18 		; mask for current row during scan
@@ -167,7 +167,7 @@ RESET:
 	clr screenStage		; initial screen (click left button to start)
 	clr counter
 	ldii debounce, 1
-	ldi running, 0 
+	ldii running, 0 
 
 	clear_datamem counterTimer
 	do_lcd_write_str str_home_msg ;write home message to screen
@@ -211,30 +211,30 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	rjmp endTimer0
 	
 	countdownSeg:
-	ldi running, 1
+	ldii running, 1
 	rcall countdownFunc
 	rjmp endTimer0
 
 	potResetSeg:
-	ldi running, 1 
+	ldii running, 1 
 	rcall potResetFunc
 	rjmp endTimer0
 
 	potFindSeg:
-	ldi running, 1 
+	ldii running, 1 
 	rcall potFindFunc
 	rjmp endTimer0
 
 	codeFindSeg:
-	ldi running, 1 
+	ldii running, 1 
 	rjmp endTimer0
 
 	codeEnterSeg:
-	ldi running, 1 
+	ldii running, 1 
 	rjmp endTimer0
 
 	winSeg:
-	ldi running, 0 
+	ldii running, 0 
 	do_lcd_write_str str_win_msg  
 	rjmp endTimer0
 	;Timer:
@@ -259,7 +259,7 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 ;	out SREG, temp
 ;	reti 
 	loseSeg:
-	ldi running, 0
+	ldii running, 0
 	toggle TIMSK1, 0
 	toggle TIMSK0,0
 	do_lcd_write_str str_timeout_msg
@@ -438,7 +438,7 @@ Timer2OVF:									; interrupt subroutine timer 2
 		rjmp dispLCDBacklight		
 
 		lcdBacklightMax:
-			ldi temp1, LCD_BACKLIGHT_STABLE	; set to stable pwm
+			ldi temp, LCD_BACKLIGHT_STABLE	; set to stable pwm
 			sts BacklightFade, temp		; store new fade state
 			rjmp fadeFinished
 
@@ -463,7 +463,7 @@ Timer2OVF:									; interrupt subroutine timer 2
 	
 	fadeFinished:
 	; if running the backlight should remain on
-	cpi running, 1						; check if running
+	cpii running, 1						; check if running
 	breq timer2Epilogue
 		
 	lds r24, BacklightCounter				; load the backlight counter
