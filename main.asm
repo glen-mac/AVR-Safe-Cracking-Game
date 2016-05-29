@@ -262,6 +262,7 @@ potResetFunc:
 	breq endpotResetSeg
 	do_lcd_write_str str_reset_msg ;this is the reset pot message?
 	mov temp, difficultyCount
+	sub temp, counter
 	rcall asciiconv
 	ldii screenStageFol, stage_pot_reset
 	lds temp, ADCSRA      ;enable ADC
