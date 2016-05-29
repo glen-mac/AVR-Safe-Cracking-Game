@@ -16,7 +16,7 @@
 
 .include "m2560def.inc"
 .include "macros.asm"
-.include "backlight.asm"
+;.include "backlight.asm"
 
 ;;;;;;;;;;;;CONSTANTS;;;;;;;;;;;;;;;;;;;
 .equ debDELAY = 800 	;Variable debounce delay
@@ -26,6 +26,7 @@
 .equ ROWMASK = 0x0F
 .equ counter_initial = 3
 .equ counter_find_pot = 20
+.equ pot_pos_reset = 22 ; our min value on the POT is 21
 .equ stage_start = 0
 .equ stage_countdown = 1
 .equ stage_pot_reset = 2
@@ -140,12 +141,18 @@ RESET:
 	ldi temp, 0xFF
 	out DDRC, temp	;PORTC is for LED bar
 	out DDRG, temp
-	
+		
+	ldi temp, (1 << REFS0) | (0 << ADLAR) | (0 << MUX0);     Set ADC reference to AVCC
+	sts ADMUX, temp
+	ldi temp, (1 << MUX5); 
+	sts ADCSRB, temp
+	ldi temp, (1 << ADEN) | (1 << ADATE) | (1 << ADIE) | (5 << ADPS0);ADC ENABLED, FREE RUNNING, INTERRUPT ENABLED, PRESCALER
+	sts ADCSRA, temp
 
 	clr temp
 	out PORTC, temp ;BLANK the LED bar
 	
-	rcall initialiseBacklightTimer  ;;code for the backlight timer
+;	rcall initialiseBacklightTimer  ;;code for the backlight timer
 	
 	clr r24
 	clr r25
@@ -178,7 +185,7 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	clr r22
 	clr r23
 
-createADCint
+;createADCint
 
 	cpii screenStage, stage_countdown
 	breq countdownSeg
@@ -202,17 +209,11 @@ createADCint
 	rjmp endTimer0
 
 	potResetSeg:
-	cpii screenStageFol, stage_pot_reset
-	breq endpotResetSeg
-	do_lcd_write_str str_reset_msg ;this is the reset pot message?
-	ldi temp, 20
-	rcall asciiconv
-	ldii screenStageFol, stage_pot_reset
-	endpotResetSeg:
-	;createADCint ;create interrupt vector
+	rcall potResetFunc
 	rjmp endTimer0
 
 	potFindSeg:
+	rcall potFindFunc
 	rjmp endTimer0
 
 	codeFindSeg:
@@ -269,6 +270,40 @@ countdownFunc:
 	toggle TIMSK1, 1<<TOIE1
 	ldii screenStageFol, stage_countdown
 	endcountdownSeg:
+	ret
+
+potResetFunc:
+	cpii screenStageFol, stage_pot_reset
+	breq endpotResetSeg
+	do_lcd_write_str str_reset_msg ;this is the reset pot message?
+	ldi temp, 20
+	rcall asciiconv
+	ldii screenStageFol, stage_pot_reset
+	lds temp, ADCSRA      ;enable ADC
+	ori temp, (1 << ADSC) ;enable ADC
+	sts ADCSRA, temp      ;enable ADC
+	clr row 				; this register used to ensure RESET position is helf for 500ms
+	clr col					; this register used to counter amount of times row has been seen to
+							; be one (obviously after checking twice in 500ms intervals it is RESET)
+	endpotResetSeg:
+		cpi row, 1
+		breq incRESETpotCount	;BRNE out of range, so a quick fix
+		ret
+		incRESETpotCount:
+			inc col ;numbers of times you have seen row as 1
+			cpi col, 5
+			ldii screenStage, stage_pot_find
+	ret
+
+potFindFunc:
+	cpii screenStageFol, stage_pot_find
+	breq endpotFindSeg
+	do_lcd_write_str str_findposition_msg ;this is the reset pot message?
+	ldii screenStageFol, stage_pot_find
+	clr row 				; this register used to ensure FIND position is helf for 500ms
+	clr col					; this register used to counter amount of times row has been seen to
+							; be one (obviously after checking twice in 500ms intervals it is FOUND)
+	endpotFindSeg:
 	ret
 
 
@@ -347,7 +382,8 @@ Timer1OVF: ;This is a countdown timer (16-bit)
 	ldi temp, high(30)
 	cpi yl, low(30)
 	cpc yh, temp
-	breq runTimer1
+	breq timer1Second
+
 	rjmp endTimer1		; fix for out of range branch
 
 
@@ -377,54 +413,59 @@ Timer1OVF: ;This is a countdown timer (16-bit)
 ;		rcall backlightFadeOut
 ;
 
-	runTimer1:
-
-	inc counter
-	clear_datamem counterTimer
+	timer1Second:
+		inc counter
+		clear_datamem counterTimer
 
 	cpii screenStage, stage_countdown
-	breq countInitialCount
+		breq countInitialCount	;for initial countdown
 	cpii screenStage, stage_pot_reset
-	breq countPotReset
+		breq countPotResetFind 	;for RESET and FIND
+	cpii screenStage, stage_pot_find
+		breq countPotResetFind 	;for RESET and FIND
 	rjmp endTimer1
 
 	countInitialCount:
-	ldi temp, counter_initial
-	sub temp, counter
-	cpi temp, 0
-	brne contInitialCount
-	ldii screenStage, stage_pot_reset		; change to POT reset screen
-	clr counter								; clear counter ready for POT reset screen
-	rjmp endTimer1
-	contInitialCount:
-	addi temp, '0'
-	do_lcd_write_str str_countdown_msg
-	do_lcd_data temp
-	do_lcd_data_i '.'
-	do_lcd_data_i '.'
-	do_lcd_data_i '.'
-	rjmp endTimer1
+		ldi temp, counter_initial
+		sub temp, counter
+		cpi temp, 0
+		brne contInitialCount
+		ldii screenStage, stage_pot_reset		; change to POT reset screen
+		clr counter								; clear counter ready for POT reset screen
+		rjmp endTimer1
+		contInitialCount:
+			addi temp, '0'
+			do_lcd_write_str str_countdown_msg
+			do_lcd_data temp
+			do_lcd_data_i '.'
+			do_lcd_data_i '.'
+			do_lcd_data_i '.'
+			rjmp endTimer1
 
-	countPotReset:
-	ldi temp, 20
-	sub temp, counter
-	cpi temp, 0
-	brne contPotReset
-	ldii screenStage, stage_lose			; change to POT timeout
-	rjmp endTimer1
-	contPotReset:
+	countPotResetFind:
+		ldi temp, 20
+		sub temp, counter
+		cpi temp, 0
+		brne countPotReset
+		ldii screenStage, stage_lose			; change to POT timeout
+		rjmp endTimer1
+		contPotResetFind:			;continues the countPotRestFind code
+			cpii screenStage, stage_pot_find
+			brne countPotReset
+				do_lcd_write_str str_findposition_msg
+				rjmp Timer1prologue
+			countPotReset:
+				;do_lcd_write_str str_reset_msg
+				rjmp Timer1prologue
 
-	do_lcd_write_str str_reset_msg
-	rjmp Timer1prologue
-
-Timer1prologue:
-	rcall asciiconv
-	rjmp endTimer1
+	Timer1prologue:
+		rcall asciiconv
+		rjmp endTimer1
 	endTimer1:
-	pop temp
-	pop yh
-	pop yl
-	reti
+		pop temp
+		pop yh
+		pop yl
+		reti
 
 
 Timer2OVF:  ;the timer for push button debouncing
@@ -486,7 +527,7 @@ nextcol: ; if row scan is over
 	inc col ; increase column value
 	jmp colloop
 convert:	
-	rcall backlightFadeIn			;;initialise the backlight to begin to fade in
+;	rcall backlightFadeIn			;;initialise the backlight to begin to fade in
 	cpi col, 3 ; If the pressed key is in col.3 
 	breq letters ; we have a letter
 				 ; If the key is not in col.3 and
@@ -592,20 +633,29 @@ EXT_INT_L:
 
 handleADC:
 	push temp
+	push temp2
 	push r20
-
 	lds r20, ADCL 
 	out PORTC, r20
-
 	lds temp, ADCH
-	;ori temp, (0b11)
-	;lsl temp
-	;ldi temp, 0b100
 	out PORTG, temp
 
+	cpii screenStage, stage_pot_reset
+	brne endHandleADC
+	ldi temp2, high(pot_pos_reset)
+	cpi r20, low(pot_pos_reset)
+	cpc temp, temp2
+	brge clrRowPreEndADC
+	ldi row, 1		; this means that RESET is being held
+	rjmp endHandleADC
+	clrRowPreEndADC:
+	clr row
+	rjmp endHandleADC
 
 
+	endHandleADC:
 	pop r20
+	pop temp2
 	pop temp
 	reti
 
