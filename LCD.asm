@@ -77,11 +77,30 @@ delayloop_1ms:
 	pop r25
 	pop r24
 	ret
-
 sleep_5ms:
 	rcall sleep_1ms
 	rcall sleep_1ms
 	rcall sleep_1ms
 	rcall sleep_1ms
 	rcall sleep_1ms
+	ret
+sleep_25ms:
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	ret 
+sleep_100ms:
+	rcall sleep_25ms
+	rcall sleep_25ms
+	rcall sleep_25ms
+	rcall sleep_25ms
+	ret
+sleep_500ms:
+	rcall sleep_100ms
+	rcall sleep_100ms
+	rcall sleep_100ms
+	rcall sleep_100ms
+	rcall sleep_100ms
 	ret
