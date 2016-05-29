@@ -129,11 +129,11 @@ RESET:
 	sts TCCR1B, temp
 	ldi temp, (1<<CS21)
 	sts TCCR2B, temp
-	ldi temp, (1<<CS31)
+	ldi temp, (1<<CS11)
 	sts TCCR3B, temp
 	toggle TIMSK0, 1<<TOIE0
-	toggle TIMSK2, 1<<TOIE2
-	;toggle TIMSK3, 1<<TOIE3
+	;toggle TIMSK2, 1<<TOIE2
+	toggle TIMSK3, 1<<TOIE3
 	;;;;;;;;prepare MISC;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   	ldi temp, PORTLDIR ; PA7:4/PA3:0, out/in
 	sts DDRL, temp
@@ -426,7 +426,7 @@ Timer1OVF: ;This is a countdown timer (16-bit)
 		pop yl
 		reti
 
-Timer2OVF:									; interrupt subroutine timer 2
+Timer3OVF:									; interrupt subroutine timer 2
 	push temp
 	push temp2
 	in temp, SREG
@@ -482,10 +482,9 @@ Timer2OVF:									; interrupt subroutine timer 2
 		;clr temp
 		;sts OCR3AH, temp	
 	
-	fadeFinished:
-		; if running the backlight should remain on
+	fadeFinished:						; if running the backlight should remain on
 	cpii running, 1						; check if running
-	breq timer2Epilogue
+	breq timer3Epilogue
 		
 	lds r24, BacklightCounter				; load the backlight counter
 	lds r25, BacklightCounter+1
@@ -497,7 +496,7 @@ Timer2OVF:									; interrupt subroutine timer 2
 	cpi r24, low(7812)						; check if it has been 1 second
 	ldi temp, high(7812)
 	cpc r25, temp
-	brne timer2Epilogue
+	brne timer3Epilogue
 	
 	clr temp							; clear the counter
 	sts BacklightCounter, temp
@@ -508,13 +507,13 @@ Timer2OVF:									; interrupt subroutine timer 2
 	sts BacklightSeconds, r24				; store new value
 
 	cpi r24, 5								; check if it has been 5 seconds
-	brne timer2Epilogue
+	brne timer3Epilogue
 	clr temp							
 	sts BacklightSeconds, temp					; reset the seconds
 	fadeOutBacklight:						; start fading out the backlight
 		rcall backlightFadeOut
 	
-	timer2Epilogue:
+	timer3Epilogue:
 	pop r25
 	pop r24
 	pop temp
@@ -523,7 +522,7 @@ Timer2OVF:									; interrupt subroutine timer 2
 	pop temp
 	reti
 
-Timer3OVF: ;keypad loop
+Timer2OVF: ;keypad loop
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;KEYPAD LOGIC;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -540,7 +539,7 @@ Timer3OVF: ;keypad loop
 colloop:
 	cpi col, 4
 	brne contColloop; If all keys are scanned, repeat.
- 	jmp endTimer3
+ 	jmp endTimer2
 	contColloop:
 	sts PORTL, cmask; Otherwise, scan a column.
 	ldi temp, 0xFF	; Slow down the scan operation.
@@ -629,9 +628,9 @@ comparecode: 		;compare the letter pressed, if it is equal to the sequential let
 	rjmp reenter
 	ldi temp, '*'			
 	do_lcd_data temp
-	toggle TIMSK3, 1<<TOIE3
+	toggle TIMSK2, 1<<TOIE2
 	ldii debounce, 1
-endTimer3:
+endTimer2:
 	pop temp
 	pop cmask
 	pop rmask
@@ -641,7 +640,7 @@ endTimer3:
 reenter:
 	clr temp 				;to reset if user enters wrong code
 	do_lcd_write_str str_entercode_msg
-	rjmp endTimer3
+	rjmp endTimer2
 	
 EXT_INT_R:
 	;;;;HOW TO USE PUSH BUTTONS:
