@@ -2,8 +2,6 @@
 ; Get Keypad done, then implement rcall backlightFadeIn after we detect precense in the keypad
 ;
 ; 'RESET POT' doesn't last 500ms, neither does the FIND POT hold for 1000ms
-;
-; Doesnt lose the game when you 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 .include "m2560def.inc"
@@ -15,7 +13,7 @@
 .equ INITCOLMASK		= 0xEF ; scan from the rightmost column,
 .equ INITROWMASK		= 0x01 ; scan from the top row
 .equ ROWMASK			= 0x0F
-.equ max_num_rounds		= 10
+.equ max_num_rounds		= 1
 .equ counter_initial	= 3
 .equ counter_find_pot	= 20
 .equ pot_pos_min		= 35 ; our min value on the POT is 21
@@ -786,6 +784,7 @@ handleADC:
 	push rmask
 	push cmask
 	push temp2
+	push col
 
 	lds temp2, ADCL 
   	lds temp, ADCH
@@ -810,6 +809,8 @@ handleADC:
 
 		performPotFind:
 
+		clr col ;boolean for adc is higher to check bounds so we cna lose game
+
 		cp temp2, cmask
 		cpc temp, rmask
 		brlo adcIsLower
@@ -823,6 +824,7 @@ handleADC:
 			sbc temp, rmask
 			mov cmask, temp2
 			mov rmask, temp
+			ldi col, 1
 		checkBelow16:
 			ldi temp, high(17)
 			cpi cmask, low(17)
@@ -852,11 +854,15 @@ handleADC:
 		notWithinAnyBounds:
 			clr temp	    ;clear these values, as the LED values will be placed in them 
 			clr temp2			;but they will remain blank in for within the set bounds
+			cpi col, 1
+			brne endCheckIfPotFind
+			ldii screenStage, stage_pot_reset
 		endCheckIfPotFind:
 			out PORTC, temp2
 			out PORTG, temp
 			rjmp endHandleADC	
 	endHandleADC:
+	pop col
 	pop temp2
 	pop cmask
 	pop rmask
