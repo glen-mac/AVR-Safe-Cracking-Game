@@ -21,43 +21,44 @@
 
 ;;;;;;;;;;;;CONSTANTS;;;;;;;;;;;;;;;;;;;
 ;.equ debDELAY = 800 	;Variable debounce delay
-.equ PORTLDIR = 0xF0 	; PD7 - 4: output, PD3 - 0, input
-.equ INITCOLMASK = 0xEF ; scan from the rightmost column,
-.equ INITROWMASK = 0x01 ; scan from the top row
-.equ ROWMASK = 0x0F
-.equ max_num_rounds = 3
-.equ counter_initial = 3
-.equ counter_find_pot = 20
-.equ pot_pos_min = 35 ; our min value on the POT is 21
-.equ pot_pos_max = 980
-.equ stage_start = 0
-.equ stage_countdown = 1
-.equ stage_pot_reset = 2
-.equ stage_pot_find = 3
-.equ stage_code_find = 4
-.equ stage_code_enter = 5
-.equ stage_win = 6
-.equ stage_lose = 7
+.equ PORTLDIR			= 0xF0 	; PD7 - 4: output, PD3 - 0, input
+.equ INITCOLMASK		= 0xEF ; scan from the rightmost column,
+.equ INITROWMASK		= 0x01 ; scan from the top row
+.equ ROWMASK			= 0x0F
+.equ max_num_rounds		= 1
+.equ counter_initial	= 3
+.equ counter_find_pot	= 20
+.equ pot_pos_min		= 35 ; our min value on the POT is 21
+.equ pot_pos_max		= 980
+.equ stage_start		= 0
+.equ stage_countdown	= 1
+.equ stage_pot_reset	= 2
+.equ stage_pot_find		= 3
+.equ stage_code_find	= 4
+.equ stage_code_enter	= 5
+.equ stage_win 			= 6
+.equ stage_lose 		= 7
 ;;;;;;;;;;;;REGISTER DEFINES;;;;;;;;;;;;
-.def screenStage = r3	; current stage the game is on
-.def screenStageFol = r4; a backlog of screenstage
-.def counter = r5		; a countdown variable
-.def running = r6		
-.def row = r16 			; current row number
-.def col = r17 			; current column number
-.def rmask = r18 		; mask for current row during scan
-.def cmask = r19		; mask for current column during scan
-.def temp = r20			; temp variable
-.def temp2 = r21		; temp variable
-.def keypadCode = r22
-.def curRound = r23
-.def difficultyCount = r24
+.def screenStage		= r3	; current stage the game is on
+.def screenStageFol 	= r4	; a backlog of screenstage
+.def counter			= r5	; a countdown variable
+.def running			= r6	
+.def keyButtonPressed	= r7	
+.def row				= r16 	; current row number
+.def col				= r17 	; current column number
+.def rmask				= r18 	; mask for current row during scan
+.def cmask				= r19	; mask for current column during scan
+.def temp				= r20	; temp variable
+.def temp2				= r21	; temp variable
+.def keypadCode			= r22
+.def curRound			= r23
+.def difficultyCount	= r24
 
 .dseg
 gameloopTimer: 			.byte 2		; counts number of timer overflows for gameloop
 counterTimer: 			.byte 2		; counts number of timer overflows for counter
 keypadTimer: 			.byte 2		; counts number of timer overflows for keypad
-randomcode: 			.byte 3		; stores the 3 'random' keypad items
+randomcode: 			.byte max_num_rounds		; stores the 3 'random' keypad items
 BacklightCounter: 		.byte 2 	; counts timer overflows
 BacklightSeconds: 		.byte 1		; counts number of seconds to trigger backlight fade out
 BacklightFadeCounter: 	.byte 1 	; used to pace the fade in process
@@ -90,7 +91,7 @@ str_timeout_msg: .db "Game over", 1, "You Lose!", 0
 str_win_msg: .db "Game complete", 1, "You Win!", 0 
 str_reset_msg: .db "Reset POT to 0", 1, "Remaining ", 0
 str_countdown_msg: .db "2121 16s1", 1, "Starting in ", 0
-str_entercode_msg: .db "Enter Code", 1, " ", 0
+str_entercode_msg: .db "Enter Code", 1, 0
 	
 RESET:
 	;;;;;;;;prepare STACK;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -143,7 +144,7 @@ RESET:
 	;;;;;;;;prepare MISC;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   	ldi temp, PORTLDIR 	;KEYPAD
 	sts DDRL, temp
-	ldi temp, 0xFF;0b0001111  ; set PORTE (pins 3&4) to output (Backlight = 4, Motor = 3)
+	ldi temp, 0b00011000  ; set PORTE (pins 3&4) to output (Backlight = 4, Motor = 3)
 	out DDRE, temp
 	ldi temp, 0xFF
 	out DDRC, temp	;PORTC is for LED bar
@@ -169,6 +170,7 @@ RESET:
 	clr keypadCode
 	clr screenStage		; initial screen (click left button to start)
 	clr counter
+	clr keyButtonPressed
 	ldii running, 0 
 	ldi difficultyCount, 20
 
@@ -220,36 +222,41 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	rjmp endTimer0
 	
 	countdownSeg:
-	ldii running, 1
+	;ldii running, 1
 	rcall countdownFunc
 	rjmp endTimer0
 
 	potResetSeg:
-	ldii running, 1 
+	;ldii running, 1 
 	rcall potResetFunc
 	rjmp endTimer0
 
 	potFindSeg:
-	ldii running, 1 
+	;ldii running, 1 
 	rcall potFindFunc
 	rjmp endTimer0
 
 	codeFindSeg:
-	ldii running, 1 
+	;ldii running, 1 
 	rcall codeFindFunc
 	rjmp endTimer0
 
 	codeEnterSeg:
-	ldii running, 1 
+	;ldii running, 1 
+	rcall codeEnterFunc
 	rjmp endTimer0
 
 	winSeg:
-	ldii running, 0 
+	cpii screenStageFol, stage_win
+	breq endwinSeg
+	ldii screenStageFol, stage_win
+	;ldii running, 0 
 	do_lcd_write_str str_win_msg  
+	endwinSeg:
 	rjmp endTimer0
 
 	loseSeg:
-	ldii running, 0
+	;ldii running, 0
 	toggle TIMSK1, 0
 	toggle TIMSK0,0
 	do_lcd_write_str str_timeout_msg
@@ -279,7 +286,7 @@ countdownFunc:
 potResetFunc:
 	cpii screenStageFol, stage_pot_reset
 	breq endpotResetSeg
-	toggle TIMSK2, 0  ;disable keypad
+	;toggle TIMSK2, 0  ;disable keypad
 	do_lcd_write_str str_reset_msg ;this is the reset pot message?
 	mov temp, difficultyCount
 	rcall asciiconv
@@ -339,6 +346,7 @@ codeFindFunc:
 	cpii screenStageFol, stage_code_find
 	breq endcodeFindSeg
 
+	toggle TIMSK1, 0 ;disable countdown
 	ldii screenStageFol, stage_code_find
 	do_lcd_write_str str_keypadscan_msg
 	lds temp, ADCSRA 
@@ -351,6 +359,18 @@ codeFindFunc:
 	clr counter	;clear counter to count timers the correct button was held
 
 	endcodeFindSeg:
+	ret
+
+codeEnterFunc:
+	cpii screenStageFol, stage_code_enter
+	breq endcodeEnterSeg
+
+	ldii screenStageFol, stage_code_enter
+	do_lcd_write_str str_entercode_msg
+
+	clr counter	;clear counter to count number of button presses to index memory in data seg
+
+	endcodeEnterSeg:
 	ret
 	
 
@@ -529,8 +549,8 @@ Timer2OVF: ;keypad loop
 	adiw Y, 1
 	sts keypadTimer, yl
   	sts keypadTimer+1, yh
-	ldi temp, high(781)
-	cpi yl, low(781)
+	ldi temp, high(390)
+	cpi yl, low(390)
 	cpc yh, temp
 	breq contTimer2
 	rjmp endTimer2
@@ -555,7 +575,18 @@ Timer2OVF: ;keypad loop
 colloop:
 	cpi col, 4
 	brne contColloop; If all keys are scanned, repeat.
+
+	;check if in findCode
+	cpii screenStageFol, stage_code_find
+	breq motorKill
+	clr keyButtonPressed
+	rjmp prologueTimer2
+	motorKill:
+	clr temp
+	out PORTE, temp
+	clr counter
  	rjmp prologueTimer2
+	
 	contColloop:
 	sts PORTL, cmask; Otherwise, scan a column.
 	ldi temp, 0xFF	; Slow down the scan operation.
@@ -587,10 +618,17 @@ convert:
 	lsl temp
 	lsl temp
 	add temp, col ; temp = row*4 + col
+
 	cpii screenStage, stage_start
 	breq setDifficulty
+
 	cpii screenStageFol, stage_code_find
-	breq compareCode
+	brne checkIfCodeEnter 
+	rjmp compareCode
+
+	checkIfCodeEnter:
+	cpii screenStageFol, stage_code_enter
+	breq keypadCodeEnter
 
 	rjmp prologueTimer2
 setDifficulty:	
@@ -611,20 +649,98 @@ setDifficulty:
 	rjmp prologueTimer2
 	D:	
 	cpi temp, 15 ;C	
-	brne prologueTimer2				
+	brne performJMPtimer2End				
 	ldi difficultyCount, 6
+
+	performJMPtimer2End:
 	rjmp prologueTimer2	
+
+keypadCodeEnter:
+
+	cpii keyButtonPressed, 1
+	brne enterKey
+	rjmp prologueTimer2
+
+	enterKey:
+	
+	clr cmask
+	ldi yl, low(randomcode)
+	ldi yh, high(randomcode)
+	add yl, counter
+	adc yh, cmask ;assuming number of rounds doesn't exceed 255...
+
+	ld temp2, Y
+
+	cp temp, temp2
+	breq correctKey
+	do_lcd_write_str str_entercode_msg
+	rjmp prologueTimer2
+
+	correctKey:
+		
+		inc counter		
+
+		do_lcd_data_i '*'
+
+		ldii keyButtonPressed, 1
+
+		cpii counter, max_num_rounds
+		brne endkeypadCodeEnter
+
+		ldii screenStage, stage_win
+
+		endkeypadCodeEnter:
+		rjmp prologueTimer2
 
 compareCode:
 
 	cp temp, keypadCode
+	breq codeMatches
+	clr counter
+
+	rjmp prologueTimer2
+	codeMatches:
+
+	inc counter
+
+	in temp, PORTE
+	ori temp, (1 << 3)
+	out PORTE, temp
+
+	cpii counter, 20
 	brne prologueTimer2
+
 	clr temp
 	ldi yl, low(randomcode)
 	ldi yh, high(randomcode)
 	add yl,	curRound
 	adc yh, temp          ;unless rounds exceeds 255....
 	st Y,  keypadCode
+
+	inc curRound
+	clr counter
+	out PORTC, temp
+	out PORTG, temp
+
+
+	clr temp
+	out PORTE, temp
+	ldii screenStageFol, -1 ;just a prevent set, so that motor doesn't run when the view changes 
+
+	cpi curRound, (max_num_rounds) 
+	breq prepCodeEnter
+
+		toggle TIMSK1, 1<<TOIE1
+		lds temp, ADCSRA 		;enable ADC
+		sbr temp, (ADSC + 1)   ;enable ADC
+		sts ADCSRA, temp      ;enable ADC
+		ldii screenStage, stage_pot_reset
+		rjmp prologueTimer2
+
+	prepCodeEnter:
+	ldii screenStage, stage_code_enter
+	ldii keyButtonPressed, 1
+	rjmp prologueTimer2
 
 prologueTimer2:
 	pop temp2
