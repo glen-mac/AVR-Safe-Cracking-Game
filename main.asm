@@ -1,19 +1,9 @@
 ;;;;;;;;;;;;; TO DO ;;;;;;;;
-;;
-;;Do Pot code
-;
-;;Consider disabling interrupts for PB1 to prevent even handling code
-;
-;;Put keypad code in Timer0, with 0 prescaler (can disable with toggle macro)
-;;when not needed)
-;;
 ; Get Keypad done, then implement rcall backlightFadeIn after we detect precense in the keypad
 ;
+; 'RESET POT' doesn't last 500ms, neither does the FIND POT hold for 1000ms
 ;
-;;Set TIMER 3 to 8 bit 
-;;
-;;Rand # is 11bit mask of a timer counter
-;;Keypad selection is lower 4 bit mask of rand #
+; Doesnt lose the game when you 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 .include "m2560def.inc"
@@ -39,6 +29,7 @@
 .equ stage_win 			= 6
 .equ stage_lose 		= 7
 ;;;;;;;;;;;;REGISTER DEFINES;;;;;;;;;;;;
+.def debounce			= r2
 .def screenStage		= r3	; current stage the game is on
 .def screenStageFol 	= r4	; a backlog of screenstage
 .def counter			= r5	; a countdown variable
@@ -164,15 +155,9 @@ RESET:
 
 	rcall initialiseBacklightTimer  ;;code for the backlight timer
 	
-	clr r24
-	clr r25
-	clr curRound
-	clr keypadCode
-	clr screenStage		; initial screen (click left button to start)
-	clr counter
-	clr keyButtonPressed
-	ldii running, 0 
+	cleanAllReg
 	ldi difficultyCount, 20
+	ldii debounce, 1 ;to prevent reset after win or lose, automatically starting another game when clicking PB1
 
 	clear_datamem counterTimer
 	clear_datamem gameloopTimer
@@ -202,6 +187,7 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 
 	contTimer0:
 
+	clr debounce	;clear debounce flag
 	clear_datamem gameloopTimer
 
 	cpii screenStage, stage_countdown
@@ -304,7 +290,8 @@ potResetFunc:
 		ret
 		incRESETpotCount:
 			inc col ;numbers of times you have seen row as 1
-			cpi col, 50
+			ldi temp, 100
+			cpse col, temp
 			ldii screenStage, stage_pot_find
 	ret
 
@@ -773,6 +760,9 @@ EXT_INT_R:
 	reti
 
 EXT_INT_L:
+	cpii debounce, 0
+	brne preEndInt
+
 	cpii screenStage, stage_start ;check if on start screen
 	brne checkStageWin
 	ldii screenStage, stage_countdown
@@ -798,9 +788,7 @@ handleADC:
 	push temp2
 
 	lds temp2, ADCL 
-	;out PORTC, temp2
   	lds temp, ADCH
-	;out PORTG, temp
 
 	cpii screenStageFol, stage_pot_reset
 		brne checkIfPotFind

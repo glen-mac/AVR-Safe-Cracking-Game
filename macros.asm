@@ -104,3 +104,21 @@
 	pop r16
 .endmacro
 
+.macro cleanAllReg
+clr screenStage		
+clr screenStageFol 	
+clr counter		
+clr running			
+clr keyButtonPressed	
+clr row				
+clr col				
+clr rmask				
+clr cmask				
+clr temp				
+clr temp2				
+clr keypadCode		
+clr curRound		
+clr difficultyCount
+clr debounce
+.endmacro
+
