@@ -41,7 +41,7 @@
 .def screenStage = r3	; current stage the game is on
 .def screenStageFol = r4; a backlog of screenstage
 .def counter = r5		; a countdown variable
-.def backlightstatus = r6
+.def running = r6
 .def row = r16 			; current row number
 .def col = r17 			; current column number
 .def rmask = r18 		; mask for current row during scan
@@ -154,7 +154,12 @@ RESET:
 	out PORTC, temp ;BLANK the LED bar
 	out PORTG, temp
 	
-;	rcall initialiseBacklightTimer  ;;code for the backlight timer
+	ser temp										; set PORTH to output (Backlight)
+	sts DDRH, temp
+	clr temp										; clear PORTH
+	sts PORTH, temp	
+	
+	rcall initialiseBacklightTimer  ;;code for the backlight timer
 	
 	clr r24
 	clr r25
@@ -170,7 +175,6 @@ RESET:
 	
 halt:
 	rjmp halt ;do nothing forever!
-
 
 Timer0OVF: ;This is an 8-bit timer - Game loop.
 	push temp
@@ -227,7 +231,7 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 	winSeg:
 	do_lcd_write_str str_win_msg  
 	rjmp endTimer0
-	;	Timer:
+	;Timer:
 ;	in temp, SREG
 ;	push temp 
 ;	push r25
@@ -332,103 +336,13 @@ Timer1OVF: ;This is a countdown timer (16-bit)
 	lds yh, counterTimer+1
 	adiw Y, 1
 	sts counterTimer, yl
-    sts counterTimer+1, yh
-
-;	lds r24, BacklightFadeCounter			; load the backlight fade counter
-;	inc r24									; increment the counter
-;	sts BacklightFadeCounter, r24
-;	cpi r24, 30								; check if has been 1sec/0xFF
-;	brne fadeFinished
-;	
-;	clr temp1								; reset fade counter
-;	sts BacklightFadeCounter, temp1	
-;
-;;	lds temp1, BacklightFade				; check what fade state
-;	cpi temp1, LCD_BACKLIGHT_FADEIN
-;	breq fadeIn
-;	cpi temp1, LCD_BACKLIGHT_FADEOUT
-;	breq fadeOut
-;;	rjmp fadeFinished
-;
-;	fadeIn:									; if fading in
-;		lds temp2, BacklightPWM
-;		cpi temp2, 0xFF						; check if already max brightness
-;		breq lcdBacklightMax
-;;		inc temp2							; inc pwm
-;		sts BacklightPWM, temp2				; store new pwm
-;		rjmp dispLCDBacklight		
-;
-;		lcdBacklightMax:
-;;			ldi temp1, LCD_BACKLIGHT_STABLE	; set to stable pwm
-;			sts BacklightFade, temp1		; store new fade state
-;			rjmp fadeFinished
-;
-;	fadeOut:
-;;		lds temp2, BacklightPWM				; if fading out
-;		cpi temp2, 0x00						; check if min brightness
-;		breq lcdBacklightMin
-;		dec temp2							; dec pwm
-;		sts BacklightPWM, temp2				;store new pwm
-;		rjmp dispLCDBacklight
-;
-;		lcdBacklightMin:
-;			ldi temp1, LCD_BACKLIGHT_STABLE
-;			sts BacklightFade, temp1
-;			rjmp fadeFinished
-;
-;	dispLCDBacklight:
-;;		lds temp1, BacklightPWM
-;		sts OCR4AL, temp1
-;		clr temp1
-;		sts OCR4AH, temp1	
-;;	
-;	fadeFinished:
-;	; if running the backlight should remain on
-;	lds temp1, mode							; load the mode
-;	cpi temp1, RUNNING						; check if running
-;	breq timer2Epilogue
-;;		
-;	lds r24, BacklightCounter				; load the backlight counter
-;	lds r25, BacklightCounter+1
-;	adiw r25:r24, 1							; increment the counter
-;		
-;	sts BacklightCounter, r24				; store new values
-;;	sts BacklightCounter+1, r25
-
-	secondcheck:
+  	sts counterTimer+1, yh
 	ldi temp, high(30)
 	cpi yl, low(30)
 	cpc yh, temp
 	breq timer1Second
 
 	rjmp endTimer1		; fix for out of range branch
-
-
-;	cpi backlightstatus, 1 
-; 	brne runTimer1
-;	clr temp1								; clear the counter
-;	sts BacklightCounter, temp1
-;	sts BacklightCounter+1, temp1
-;
-;	lds r24, BacklightSeconds				; load backlight seconds
-;	inc r24									; increment the baclight seconds
-;	sts BacklightSeconds, r24				; store new value
-;;
-;	cpi r24, 10								; check if it has been 10 seconds
-;	brne timer2Epilogue
-;	
-;	clr temp1								; reset the seconds
-;	sts BacklightSeconds, temp1
-;
-;	clr temp2
-;	lds temp1, door
-;	cpi temp1, 0
-;	breq fadeOutBacklight
-;	ldi temp2, DOOR_LIGHT_MASK	
-
-;	fadeOutBacklight:						; start fading out the backlight
-;		rcall backlightFadeOut
-;
 
 	timer1Second:
 		inc counter
@@ -484,19 +398,100 @@ Timer1OVF: ;This is a countdown timer (16-bit)
 		pop yl
 		reti
 
-
-Timer2OVF:  ;the timer for push button debouncing
+Timer2OVF:									; interrupt subroutine timer 2
 	push temp
-	adiw r24:r25, 1
-	ldi temp, high(debDELAY)
-	cpi r24, low(debDELAY)
+	push temp2
+	in temp, SREG
+	push temp
+	push r24
+	push r25	
+
+	lds r24, BacklightFadeCounter			; load the backlight fade counter
+	inc r24									; increment the counter
+	sts BacklightFadeCounter, r24
+	cpi r24, 30								; check if has been 1sec/0xFF
+	brne fadeFinished
+	
+	clr temp								; reset fade counter
+	sts BacklightFadeCounter, temp	
+
+	lds temp, BacklightFade				; check what fade state
+	cpi temp, LCD_BACKLIGHT_FADEIN
+	breq fadeIn
+	cpi temp, LCD_BACKLIGHT_FADEOUT
+	breq fadeOut					;if BacklightFade = 0
+	rjmp fadeFinished
+
+	fadeIn:									; if fading in
+		lds temp2, BacklightPWM
+		cpi temp2, 0xFF						; check if already max brightness
+		breq lcdBacklightMax
+		inc temp2							; inc pwm
+		sts BacklightPWM, temp2				; store new pwm
+		rjmp dispLCDBacklight		
+
+		lcdBacklightMax:
+			ldi temp1, LCD_BACKLIGHT_STABLE	; set to stable pwm
+			sts BacklightFade, temp		; store new fade state
+			rjmp fadeFinished
+
+	fadeOut:
+		lds temp2, BacklightPWM				; if fading out
+		cpi temp2, 0x00						; check if min brightness
+		breq lcdBacklightMin
+		dec temp2							; dec pwm
+		sts BacklightPWM, temp2				;store new pwm
+		rjmp dispLCDBacklight
+
+		lcdBacklightMin:
+			ldi temp, LCD_BACKLIGHT_STABLE
+			sts BacklightFade, temp
+			rjmp fadeFinished
+
+	dispLCDBacklight:
+		lds temp, BacklightPWM
+		sts OCR3AL, temp
+		clr temp
+		sts OCR3AH, temp	
+	
+	fadeFinished:
+	; if running the backlight should remain on
+	lds temp, mode							; load the mode
+	cpi temp, RUNNING						; check if running
+	breq timer2Epilogue
+		
+	lds r24, BacklightCounter				; load the backlight counter
+	lds r25, BacklightCounter+1
+	adiw r25:r24, 1							; increment the counter
+		
+	sts BacklightCounter, r24				; store new values
+	sts BacklightCounter+1, r25
+
+	cpi r24, low(7812)						; check if it has been 1 second
+	ldi temp, high(7812)
 	cpc r25, temp
-	brne endTimer2
-	ldii debounce, 1
-	toggle TIMSK2, 0
-	clr r24
-	clr r25
-	endTimer2:
+	brne timer2Epilogue
+	
+	clr temp							; clear the counter
+	sts BacklightCounter, temp
+	sts BacklightCounter+1, temp
+
+	lds r24, BacklightSeconds				; load backlight seconds
+	inc r24									; increment the baclight seconds
+	sts BacklightSeconds, r24				; store new value
+
+	cpi r24, 5								; check if it has been 5 seconds
+	brne timer2Epilogue							
+	sts BacklightSeconds, temp					; reset the seconds
+	fadeOutBacklight:						; start fading out the backlight
+		rcall backlightFadeOut
+	
+	timer2Epilogue:
+	pop r25
+	pop r24
+	pop temp
+	out SREG, temp
+	pop temp2
 	pop temp
 	reti
 
