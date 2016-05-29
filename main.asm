@@ -619,10 +619,14 @@ convert:
 	add temp, col ; temp = row*4 + col
 	
 	cpii screenStage, stage_win
-	breq RESET
-	
-	cpiiscreenStage, stage_lose
-	breq RESET
+	breq winLoseReset
+	cpii screenStage, stage_lose
+	brne checkRemaindingStages
+
+	winLoseReset:
+	rjmp RESET
+
+	checkRemaindingStages:
 	
 	cpii screenStage, stage_start
 	breq setDifficulty
@@ -769,26 +773,22 @@ EXT_INT_R:
 	reti
 
 EXT_INT_L:
-	;cpii debounce, 1
-	;brne endIntL
-	;clr debounce
-	;check screenstage 'switch statement'
 	cpii screenStage, stage_start ;check if on start screen
 	brne checkStageWin
 	ldii screenStage, stage_countdown
 	rjmp preEndInt
+
 	checkStageWin:
 	cpii screenStage, stage_win
 	brne checkStageLose
-	;ldii screenStage, stage_start
-	;toggle PORTE, _______
 	rjmp RESET
+
 	checkStageLose:
 	cpii screenStage, stage_lose
-	rjmp RESET
 	brne preEndInt
-	;toggle TIMSK, 1<<TOIE2
-	;endIntL:
+	rjmp RESET	
+
+	preEndInt:
 	reti
 
 handleADC:
