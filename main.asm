@@ -55,7 +55,7 @@ BacklightFade: 			.byte 1 ; flag indicating current backlight process - stable/f
 BacklightPWM: 			.byte 1 ; current backlight brightness
 
 ; Speaker variables
-keypressCounter: .byte 1 						; number of loops so far
+speakerCounter: .byte 1 						; number of loops so far
 finishedSoundCounter: .byte 1 					; number of beeps so far
 finishedBeepCounter: .byte 2 					; number of loops so far in a beep
 
