@@ -16,7 +16,7 @@ initialiseBacklightTimer:
 	ldi temp, 0xFF
 	sts BacklightPWM, temp
 
-	ldi temp, (1 << WGM20)|(1 << COM3B1)
+	ldi temp, (1 << WGM30)|(1 << COM3B1)
 	sts TCCR3A, temp
 
 	ldi temp, 0xFF 					; initialise output compare value
@@ -46,6 +46,13 @@ backlightFadeOut:
 
 	ldi temp, LCD_BACKLIGHT_FADEOUT			; set backlight fade state to fade out
 	sts BacklightFade, temp
+
+	;sts BacklightPWM, temp2
+	
+	;clr temp
+	;sts BacklightSeconds, temp
+	;sts BacklightCounter, temp
+	;sts BacklightCounter+1, temp
 
 	pop temp
 	ret

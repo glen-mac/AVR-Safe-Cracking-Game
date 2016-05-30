@@ -160,7 +160,7 @@ RESET:
 	sts TCCR1B, temp
 	ldi temp, (1<<CS21)
 	sts TCCR2B, temp
-	ldi temp, (1<<CS11)
+	ldi temp, (1<<CS31)
 	sts TCCR3B, temp
 	toggle TIMSK0, 1<<TOIE0
 	toggle TIMSK1, 0
@@ -200,6 +200,7 @@ RESET:
 	do_lcd_write_str str_home_msg ;write home message to screen
 
 	do_lcd_show_custom 2, 0
+
 
 	sei
 	
@@ -396,34 +397,33 @@ codeEnterFunc:
 winFunc:
 	cpii screenStageFol, stage_win
 	breq prologuewinSeg
+	clr running
 	ldii screenStageFol, stage_win
-	;ldii running, 0
 	toggle TIMSK1, 0
 
 	do_lcd_write_str str_win_msg
 	clr counter
-
 	prologuewinSeg:
-		ldii running, 0
 		inc counter
 		cpii counter, 5
 		brne endwinSeg
 		toggleStrobe
 		clr counter
-
 	endwinSeg: 
-
 	ret
 
 loseFunc:
-	ldii running, 0
+	cpii screenStageFol, stage_lose
+	breq prologueloseSeg
+	clr running
+	ldii screenStageFol, stage_lose
 	toggle TIMSK1, 0
-	toggle TIMSK0,0
 	disable_ADC
 	ldi temp, 0
 	out PORTC, temp
 	out PORTG, temp
 	do_lcd_write_str str_timeout_msg
+	prologueloseSeg:
 	ret
 
 Timer1OVF: ;This is a countdown timer (16-bit)
@@ -503,7 +503,7 @@ Timer3OVF:									; interrupt subroutine timer 2
 	push r24
 	push r25
 	 
-	lds r24, BacklightFadeCounter						; load the backlight fade counter
+	lds r24, BacklightFadeCounter				; load the backlight fade counter
 	inc r24									; increment the counter
 	sts BacklightFadeCounter, r24
 	cpi r24, 15							; check if has been 0.5sec/0xFF
@@ -517,39 +517,41 @@ Timer3OVF:									; interrupt subroutine timer 2
 	breq FadeIn
 	cpi temp, LCD_BACKLIGHT_FADEOUT
 	breq FadeOut							;if BacklightFade = 0 which is the case when it is first set up
-	rjmp FadeFinished 
+	rjmp fadeFinished 
 
 	FadeIn:									; if fading in
 		lds temp2, BacklightPWM
 		cpi temp2, 0xFF						; check if already max brightness
-		breq lcdBacklightMax
+		breq lcdBacklightReached
 		inc temp2							; inc pwm
 		sts BacklightPWM, temp2				; store new pwm
 		rjmp dispLCDBacklight		
 
-		lcdBacklightMax:
-			ldi temp, LCD_BACKLIGHT_STABLE	; set to stable pwm
-			sts BacklightFade, temp		; store new fade state
-			rjmp FadeFinished
-
 	FadeOut:
 		lds temp2, BacklightPWM				; if fading out
 		cpi temp2, 0x00						; check if min brightness
-		breq lcdBacklightMin
+		breq lcdBacklightReached
 		dec temp2							; dec pwm
 		sts BacklightPWM, temp2				;store new pwm
 		rjmp dispLCDBacklight
 
-		lcdBacklightMin:
-			ldi temp, LCD_BACKLIGHT_STABLE
-			sts BacklightFade, temp
-			rjmp fadeFinished
+	lcdBacklightReached:
+		ldi temp, LCD_BACKLIGHT_STABLE
+		sts BacklightFade, temp
+		rjmp endFadeCode
 
 	dispLCDBacklight:
 		lds temp, BacklightPWM
 		sts OCR3BL, temp
+	
+	endFadeCode:
+		clr temp									; reset the backlight counter
+		sts BacklightSeconds, temp
+		sts BacklightCounter, temp
+		sts BacklightCounter+1, temp
 		
-	FadeFinished:						; if running the backlight should remain on
+	fadeFinished:						; if running the backlight should remain on
+	
 	cpii running, 1						; check if game is in one of the running stages 
 	breq timer3Epilogue 
 	
@@ -559,14 +561,12 @@ Timer3OVF:									; interrupt subroutine timer 2
 	sts BacklightCounter, r24				; store new values
 	sts BacklightCounter+1, r25
 
-	cpi r24, low(3906)						; check if it has been 1 second
 	ldi temp, high(3906)
+	cpi r24, low(3906)						; check if it has been 1 second
 	cpc r25, temp
 	brne timer3Epilogue
-	
-	clr temp							; clear the counter
-	sts BacklightCounter, temp
-	sts BacklightCounter+1, temp
+
+	clear_datamem BacklightCounter
 
 	lds r24, BacklightSeconds				; load backlight seconds
 	inc r24									; increment the backlight seconds
@@ -576,6 +576,7 @@ Timer3OVF:									; interrupt subroutine timer 2
 	brne timer3Epilogue
 	clr temp							
 	sts BacklightSeconds, temp					; reset the seconds
+
 	fadeOutBacklight:						; start fading out the backlight
 		rcall backlightFadeOut
 	
@@ -662,6 +663,7 @@ nextcol: ; if row scan is over
 	rjmp colloop
 convert:	
 	rcall backlightFadeIn			;;initialise the backlight to begin to fade in
+
 	mov temp, row 
 	lsl temp
 	lsl temp
@@ -674,7 +676,7 @@ convert:
 
 	winLoseReset:
 	cpii keyButtonPressed, 1
-		breq checkRemaindingStages
+	breq endConvert
 	rjmp RESET
 
 	checkRemaindingStages:
@@ -949,7 +951,7 @@ asciiconv:				;no need for ascii convert as digits show up as '*' (we need this 
  	cpi temp, 100
  	brlo numtens ;branch if lower due to unsigned
  	inc r17
- 	subi temp, 100
+ 	subi temp, 100 
  	rjmp numhundreds
 	numtens:
 	cpi temp, 10
