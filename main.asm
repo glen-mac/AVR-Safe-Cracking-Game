@@ -358,8 +358,8 @@ codeEnterFunc:
 	ret
 	
 winFunc:
-	cpii screenStageFol, stage_win
-	breq endwinSeg
+	;cpii screenStageFol, stage_win
+	;breq endwinSeg
 	ldii screenStageFol, stage_win
 	ldii running, 0 
 	do_lcd_write_str str_win_msg 
