@@ -69,7 +69,6 @@ gameloopTimer:			.byte 2	; counts number of timer overflows for gameloop
 counterTimer: 			.byte 2	; counts number of timer overflows for counter
 keypadTimer: 			.byte 2	; counts number of timer overflows for keypad
 randomcode: 			.byte max_num_rounds; stores the 3 'random' keypad items
-difficultySave:			.byte 1 ; the difficulty saved
 BacklightCounter: 		.byte 2 ; counts timer overflows
 BacklightSeconds: 		.byte 1	; counts number of seconds to trigger backlight fade out
 BacklightFadeCounter: 	.byte 1 ; used to pace the fade in process
@@ -103,10 +102,10 @@ finishedBeepCounter: .byte 2 					; number of loops so far in a beep
 .org 0x70 ;(1 denotes a new line, 0 denotes end of second line)
 str_home_msg: 			.db 	"2121 16s1", 		1, 		"Safe Cracker",0, 	0
 str_keypadscan_msg: 	.db 	"Position found!",	1, 		"Scan for number", 	0
-str_findposition_msg: 	.db 	"Find POT POS", 	1, 		"Remaining: ",0, 	0
+str_findposition_msg: 	.db 	"Find POT POS", 	1, 		"Remaining:      ", 0
 str_timeout_msg:		.db 	"Game over", 		1, 		"You Lose!", 		0 
 str_win_msg: 			.db 	"Game complete", 	1, 		"You Win!",0, 		0 
-str_reset_msg:			.db 	"Reset POT to 0", 	1, 		"Remaining ", 		0
+str_reset_msg:			.db 	"Reset POT to 0", 	1, 		"Remaining:      ", 0
 str_countdown_msg: 		.db 	"2121 16s1", 		1, 		"Starting in ",0, 	0
 str_entercode_msg: 		.db 	"Enter Code", 		1, 							0
 lcd_char_smiley: 		.db		0x00, 0x00, 0x0A, 0x00, 0x11, 0x0E, 0x00, 0x00
@@ -119,10 +118,7 @@ lcd_char_zero: 			.db		0x0E, 0x0A, 0x0A, 0x0E, 0x00, 0x00, 0x00, 0x00
 	
 RESET:
 	;;;;;;;;prepare STACK;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	ldi temp, low(RAMEND) ; initialize the stack
-	out SPL, temp
-	ldi temp, high(RAMEND)
-	out SPH, temp
+	reset_Stack
   	;;;;;;;;prepare LCD;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	ser r16
 	out DDRF, r16 
@@ -164,7 +160,6 @@ RESET:
 	ldi temp, (1<<CS31)
 	sts TCCR3B, temp
 	toggle TIMSK0, 1<<TOIE0
-	toggle TIMSK1, 0
 	toggle TIMSK2, 1<<TOIE2  ;timer for difficulty
 	toggle TIMSK3, 1<<TOIE3
 	;;;;;;;;prepare MISC;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -185,22 +180,39 @@ RESET:
 	sts ADMUX, temp
 	ldi temp, (1 << MUX5); 
 	sts ADCSRB, temp
-	ldi temp, (1 << ADEN) | (1 << ADATE) | (1 << ADIE) | (5 << ADPS0);ADC ENABLED, FREE RUNNING, INTERRUPT ENABLED, PRESCALER
+	ldi temp,  (1 << ADATE) | (1 << ADIE) | (5 << ADPS0);ADC ENABLED, FREE RUNNING, INTERRUPT ENABLED, PRESCALER
 	sts ADCSRA, temp
 
 	rcall initialiseBacklightTimer  ;;code for the backlight timer
 	
 	cleanAllReg
 
-	ldii debounce, 1 ;to prevent reset after win or lose, automatically starting another game when clicking PB1
+	gameRestart:
 
-	clear_datamem counterTimer
-	clear_datamem gameloopTimer
-	clear_datamem keypadTimer
+		reset_Stack
 
-	do_lcd_write_str str_home_msg ;write home message to screen
+		toggle TIMSK1, 0
 
-	lds difficultyCount, difficultySave
+		clr screenStage
+		clr screenStageFol
+		clr counter
+		clr running
+		clr curRound
+
+		in temp, PORTA
+		andi temp, 0xFD
+		out PORTA, temp	
+
+		ldii debounce, 1 ;to prevent reset after win or lose, automatically starting another game when clicking PB1
+
+		clear_datamem counterTimer
+		clear_datamem gameloopTimer
+		clear_datamem keypadTimer
+		clear_datamem randomcode
+
+		do_lcd_write_str str_home_msg ;write home message to screen
+
+	;lds difficultyCount, difficultySave
  	cpi difficultyCount, 15
  	brne Check10
  	do_lcd_show_custom 1, 5
@@ -218,8 +230,8 @@ RESET:
 	Set20:
 	ldi difficultyCount, 20
  	do_lcd_show_custom 2, 0
-
 	endRestoreDifficulty:
+
 	sei
 	
 halt:
@@ -316,7 +328,9 @@ potResetFunc:
 	cpii screenStageFol, stage_pot_reset
 	breq endpotResetSeg
 	ldii running, 1 
+	enable_ADC
 	do_lcd_write_str str_reset_msg ;this is the reset pot message?
+	do_lcd_command 0b11001011
 	mov temp, difficultyCount
 	sub temp, counter
 	rcall asciiconv
@@ -346,6 +360,7 @@ potFindFunc:
 	breq endpotFindSeg
 	ldii running, 1 
 	do_lcd_write_str str_findposition_msg ;this is the reset pot message?
+	do_lcd_command 0b11001011
 	mov temp, difficultyCount
 	sub temp, counter
 	rcall asciiconv
@@ -481,7 +496,7 @@ Timer1OVF: ;This is a countdown timer (16-bit)
 		rjmp endTimer1
 		contInitialCount:
 			addi temp, '0'
-			do_lcd_write_str str_countdown_msg
+			do_lcd_command 0b11001100  ;shift cursor to where countdown is on screen, to make it smooth
 			do_lcd_data temp
 			do_lcd_data_i '.'
 			do_lcd_data_i '.'
@@ -498,10 +513,12 @@ Timer1OVF: ;This is a countdown timer (16-bit)
 		contPotResetFind:			;continues the countPotRestFind code
 			cpii screenStage, stage_pot_find
 			brne countPotReset
-				do_lcd_write_str str_findposition_msg
+				;do_lcd_write_str str_findposition_msg
+				do_lcd_command 0b11001011
 				rjmp Timer1prologue
 			countPotReset:
-				do_lcd_write_str str_reset_msg
+				;do_lcd_write_str str_reset_msg
+				do_lcd_command 0b11001011
 				rjmp Timer1prologue
 
 	Timer1prologue:
@@ -695,8 +712,8 @@ convert:
 	winLoseReset:
 	cpii keyButtonPressed, 1
 	breq endConvert
-	sts difficultySave, difficultyCount
-	rjmp RESET
+	;sts difficultySave, difficultyCount
+	rjmp gameRestart
 
 	checkRemaindingStages:
 	
@@ -842,8 +859,12 @@ endTimer2:
 	pop yl
 	reti
 	
-EXT_INT_R:
-	rjmp RESET
+EXT_INT_R:	
+	rcall backlightFadeIn
+	cpii screenStage, stage_start ;check if on start screen
+	breq preEndRestartButton
+	rjmp gameRestart
+	preEndRestartButton:
 	reti
 
 EXT_INT_L:
@@ -858,12 +879,12 @@ EXT_INT_L:
 	checkStageWin:
 	cpii screenStage, stage_win
 	brne checkStageLose
-	rjmp RESET
+	rjmp gameRestart
 
 	checkStageLose:
 	cpii screenStage, stage_lose
 	brne preEndInt
-	rjmp RESET	
+	rjmp gameRestart	
 
 	preEndInt:
 	reti
@@ -959,19 +980,19 @@ handleADC:
 	reti
 
 asciiconv:				;no need for ascii convert as digits show up as '*' (we need this for count down)
-	push r17
+	;push r17
 	push r18
 	push r19
 	push temp
 	clr r18
 	clr r19
-	clr r17
-  	numhundreds:
- 	cpi temp, 100
- 	brlo numtens ;branch if lower due to unsigned
- 	inc r17
- 	subi temp, 100 
- 	rjmp numhundreds
+	;clr r17
+  	;numhundreds:
+ 	;cpi temp, 100
+ 	;brlo numtens ;branch if lower due to unsigned
+ 	;inc r17
+ 	;subi temp, 100 
+ 	;rjmp numhundreds
 	numtens:
 	cpi temp, 10
 	brlo numones ;branch if lower due to unsigned
@@ -981,17 +1002,18 @@ asciiconv:				;no need for ascii convert as digits show up as '*' (we need this 
 	numones:
 	mov r18, temp
 	ldi temp, '0'
-	addi r17, '0'
- 	cpse r17, temp
- 	do_lcd_data r17
+	;addi r17, '0'
+ 	;cpse r17, temp
+ 	;do_lcd_data r17
 	addi r19, '0'
+	;cpse r19, temp
 	do_lcd_data r19
 	addi r18, '0'
 	do_lcd_data r18
 	pop temp
 	pop r19
 	pop r18
-	pop r17
+	;pop r17
 	ret
 
 ;;;;;;;LEAVE THIS HERE - NEEDS TO BE INCLUDED LAST!!!;;;;;;;

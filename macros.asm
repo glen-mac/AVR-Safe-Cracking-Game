@@ -34,8 +34,20 @@
 
 .macro disable_ADC
 	push temp
+	push temp2
+	ldi temp2, (1 << ADEN) | (1 << ADSC)
+	com temp2
 	lds temp, ADCSRA 
-	cbr temp, (ADEN + 1)   ;disable ADC
+	and temp, temp2   ;disable ADC
+	sts ADCSRA, temp      ;disable ADC
+	pop temp2
+	pop temp
+.endmacro
+
+.macro enable_ADC
+	push temp
+	lds temp, ADCSRA 
+	ori temp, (1 << ADEN) | (1 << ADSC)  ;disable ADC
 	sts ADCSRA, temp      ;disable ADC
 	pop temp
 .endmacro
@@ -58,6 +70,13 @@
 	do_lcd_data_i @0
 	do_lcd_command 0b10001111
 	do_lcd_data_i @1
+.endmacro
+
+.macro reset_Stack
+	ldi temp, low(RAMEND) ; initialize the stack
+	out SPL, temp
+	ldi temp, high(RAMEND)
+	out SPH, temp
 .endmacro
 
 ; Pass this macro a register, and it will put

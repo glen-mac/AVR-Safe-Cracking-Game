@@ -171,16 +171,4 @@ sleep_25ms:
 	rcall sleep_5ms
 	rcall sleep_5ms
 	ret 
-sleep_100ms:
-	rcall sleep_25ms
-	rcall sleep_25ms
-	rcall sleep_25ms
-	rcall sleep_25ms
-	ret
-sleep_500ms:
-	rcall sleep_100ms
-	rcall sleep_100ms
-	rcall sleep_100ms
-	rcall sleep_100ms
-	rcall sleep_100ms
-	ret
+
