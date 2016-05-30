@@ -186,3 +186,32 @@
 	pop temp
 .endmacro
 
+
+
+.macro performRandomLCG
+	push temp
+	push temp2
+	push col
+
+	ldi col, 1
+	lds temp, randomPosition
+	lds temp2, randomPosition + 1
+	add temp, col
+	ldi col, 0
+	adc temp2, col
+	sts randomPosition, temp
+	sts randomPosition + 1, temp2
+
+	pop col
+	pop temp2
+	pop temp
+.endmacro
+
+
+.macro speakerBeepFor
+	push temp
+		ldi temp, @0
+		sts speakerCounterGoal, temp
+		toggle TIMSK4, 1<<TOIE4
+	pop temp
+.endmacro

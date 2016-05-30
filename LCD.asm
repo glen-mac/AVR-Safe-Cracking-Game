@@ -26,7 +26,6 @@ lcd_store_custom:
 	push row
 	push col
 	push rmask
-
 	clr col
 
 	lcdStoreLoop:
@@ -45,29 +44,23 @@ lcd_store_custom:
 	or rmask, row
 	or temp, rmask
 
-;	ldi temp, 0b01001000
-
 	rcall lcd_set_pos
 
 	lpm temp, Z+
 	andi temp, 0b00011111
 
-	;ldi temp, 0b11101010
 
 	rcall lcd_set_dat
 
 	inc col
 
-	cpi col, 7
+	cpi col, 8
 	brne lcdStoreLoop
-	;do_lcd_command 0b10000000	
 
 	pop rmask
 	pop col
 	pop row
 	pop temp
-
-
 	ret
 
 

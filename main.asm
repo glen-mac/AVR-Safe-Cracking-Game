@@ -1,30 +1,5 @@
 ;;;;;;;;;;;;; TO DO ;;;;;;;;
-; implement rcall backlightFadeIn 
-;
-; Implement Sound
-;
-; Implement Strobe on win
-;countdownspeaker: 											; generates a 250ms beep - called when a keypress is successfully registered
-;	push temp
-;	clr temp										; initialise keypress counter
-;	sts speakerCounter, temp
-;
-;	speakerloop:
-;		lds temp, keypressCounter 					; loop 124 times
-;		inc temp
-;		sts speakerCounter, temp
-;		cpi temp, 124
-;		breq speakerEpilogue
-;
-;		sbi PORTB, 0  								; make sound
-;		rcall sleep_1ms
-;		cbi PORTB, 0
-;		rcall sleep_1ms
-;		rjmp speakerloop
-;
-;	speakerEpilogue:
-;	pop temp
-;	ret
+; Get HDs
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 .include "m2560def.inc"
@@ -35,7 +10,10 @@
 .equ INITCOLMASK		= 0xEF 	; scan from the rightmost column,
 .equ INITROWMASK		= 0x01 	; scan from the top row
 .equ ROWMASK			= 0x0F	; mask for the row
-.equ max_num_rounds		= 1		; the number of rounds that will be played
+.equ speaker250			= 61
+.equ speaker500			= 122
+.equ speaker1000		= 244
+.equ max_num_rounds		= 3		; the number of rounds that will be played
 .equ counter_initial	= 3		; the intial countdown value
 .equ pot_pos_min		= 22	; the minimum value on the pot
 .equ pot_pos_max		= 1004	; the maximum value on the pot
@@ -74,11 +52,9 @@ BacklightSeconds: 		.byte 1	; counts number of seconds to trigger backlight fade
 BacklightFadeCounter: 	.byte 1 ; used to pace the fade in process
 BacklightFade: 			.byte 1 ; flag indicating current backlight process - stable/fade in/fade out
 BacklightPWM: 			.byte 1 ; current backlight brightness
-
-; Speaker variables
-speakerCounter: .byte 1 						; number of loops so far
-finishedSoundCounter: .byte 1 					; number of beeps so far
-finishedBeepCounter: .byte 2 					; number of loops so far in a beep
+speakerCounter: 		.byte 1 ; number of loops so far
+speakerCounterGoal:		.byte 1 ; number of beeps so far
+randomPosition:			.byte 2
 
 ;;;;;;;;;;;;VECTOR TABLE;;;;;;;;;;;;;;
 .cseg
@@ -96,6 +72,8 @@ finishedBeepCounter: .byte 2 					; number of loops so far in a beep
 	jmp Timer2OVF	; keypad timer
 .org OVF3addr
 	jmp Timer3OVF	; backlight timer
+.org OVF4addr
+	jmp Timer4OVF	; speaker timer
 .org 0x3A
 	jmp handleADC	; ADC complete reading
 ;;;;;;;;;;;;STRING LIST;;;;;;;;;;;;;;
@@ -150,7 +128,8 @@ RESET:
 	out TCCR0A, temp
 	sts TCCR1A, temp
 	sts TCCR2A, temp
-	sts TCCR3A, temp
+	;sts TCCR3A, temp
+	sts TCCR4A, temp
 	ldi temp, (1<<CS01)
 	out TCCR0B, temp
 	ldi temp, (1<<CS11)
@@ -159,6 +138,8 @@ RESET:
 	sts TCCR2B, temp
 	ldi temp, (1<<CS31)
 	sts TCCR3B, temp
+	ldi temp, (1<<CS40)
+	sts TCCR4B, temp
 	toggle TIMSK0, 1<<TOIE0
 	toggle TIMSK2, 1<<TOIE2  ;timer for difficulty
 	toggle TIMSK3, 1<<TOIE3
@@ -170,11 +151,14 @@ RESET:
 	ldi temp, 0xFF
 	out DDRC, temp	;PORTC is for LED bar
 	out DDRG, temp	;PORTG is for LED bar (top 2 LEDs)
+	ldi temp, 1
+	out DDRB, temp
 	ldi temp, 0b00010000	;	pin position 3 is motor, 4 is LCD									
 	out PORTE, temp	
 	clr temp
 	out PORTC, temp  ;BLANK the LED bar
 	out PORTG, temp  ;BLANK the top LEDs on LED bar
+	out PORTB, temp
 		
 	ldi temp, (1 << REFS0) | (0 << ADLAR) | (0 << MUX0);     Set ADC reference to AVCC
 	sts ADMUX, temp
@@ -192,12 +176,16 @@ RESET:
 		reset_Stack
 
 		toggle TIMSK1, 0
+		toggle TIMSK4, 0
 
 		clr screenStage
 		clr screenStageFol
 		clr counter
 		clr running
 		clr curRound
+		sts speakerCounter, counter
+		out PORTC, counter
+		out PORTG, counter
 
 		in temp, PORTA
 		andi temp, 0xFD
@@ -209,8 +197,11 @@ RESET:
 		clear_datamem gameloopTimer
 		clear_datamem keypadTimer
 		clear_datamem randomcode
+		clear_datamem speakerCounter
 
 		do_lcd_write_str str_home_msg ;write home message to screen
+		do_lcd_command 0b11001111
+		do_lcd_data_i 3
 
 	;lds difficultyCount, difficultySave
  	cpi difficultyCount, 15
@@ -238,6 +229,7 @@ halt:
 	rjmp halt ;do nothing forever!
 
 Timer0OVF: ;This is an 8-bit timer - Game loop.
+performRandomLCG
 	push yl
 	push yh
 	push temp
@@ -326,11 +318,18 @@ countdownFunc:
 
 potResetFunc:
 	cpii screenStageFol, stage_pot_reset
-	breq endpotResetSeg
+	brne sdfsdfsdfsd
+	rjmp endpotResetSeg
+	;breq endpotResetSeg
+
+	sdfsdfsdfsd:
+
 	ldii running, 1 
 	enable_ADC
+
 	do_lcd_write_str str_reset_msg ;this is the reset pot message?
 	do_lcd_command 0b11001011
+
 	mov temp, difficultyCount
 	sub temp, counter
 	rcall asciiconv
@@ -341,6 +340,13 @@ potResetFunc:
 	clr row 				; this register used to ensure RESET position is helf for 500ms
 	clr col					; this register used to counter amount of times row has been seen to
 							; be one (obviously after checking twice in 500ms intervals it is RESET)
+
+	;lds temp, speakerNewRound
+	;;cpi temp, 1
+	;brne endpotResetSeg
+	;speakerBeepFor speaker500
+	;sts speakerNewRound, col
+
 	endpotResetSeg:
 		cpi row, 1
 		breq incRESETpotCount	;BRNE out of range, so a quick fix
@@ -365,20 +371,7 @@ potFindFunc:
 	sub temp, counter
 	rcall asciiconv
 	ldii screenStageFol, stage_pot_find
-	pickRandPotVal:
-	lds cmask, TCNT1L	    ; this register used to hold LOW 8 bits of RAND number
-	lds rmask, TCNT1H       ; this register used to hold HIGH bits of RAND number
-	andi rmask, 0b11
-	
-	ldi temp, high(pot_pos_max)
-	cpi cmask, low(pot_pos_max)
-	cpc rmask, temp
-	brsh pickRandPotVal
 
-	ldi temp, high(pot_pos_min)
-	cpi cmask, low(pot_pos_min)
-	cpc rmask, temp
-	brlo pickRandPotVal
 
 	clr row 			    ; this register used to ensure FIND position is helf for 500ms
 	clr col					; this register used to counter amount of times row has been seen to
@@ -399,8 +392,15 @@ potFindFunc:
 
 codeFindFunc:
 	cpii screenStageFol, stage_code_find
-	breq endcodeFindSeg
+	brne continueCodeFindFunc
+	rjmp endcodeFindSeg
+
+	continueCodeFindFunc:
+
 	ldii running, 1 
+	
+	rcall randomizePotLocation
+
 	toggle TIMSK1, 0 ;disable countdown
 	ldii screenStageFol, stage_code_find
 	do_lcd_write_str str_keypadscan_msg
@@ -433,7 +433,7 @@ winFunc:
 	clr running
 	ldii screenStageFol, stage_win
 	toggle TIMSK1, 0
-
+	speakerBeepFor speaker1000
 	do_lcd_write_str str_win_msg
 	clr counter
 	prologuewinSeg:
@@ -449,6 +449,7 @@ loseFunc:
 	cpii screenStageFol, stage_lose
 	breq prologueloseSeg
 	clr running
+	speakerBeepFor speaker1000
 	ldii screenStageFol, stage_lose
 	toggle TIMSK1, 0
 	disable_ADC
@@ -460,6 +461,8 @@ loseFunc:
 	ret
 
 Timer1OVF: ;This is a countdown timer (16-bit)
+performRandomLCG
+	;performRandomLCG
 	push yl
 	push yh
 	push temp
@@ -492,7 +495,10 @@ Timer1OVF: ;This is a countdown timer (16-bit)
 		cpi temp, 0
 		brne contInitialCount
 		ldii screenStage, stage_pot_reset		; change to POT reset screen
-		clr counter								; clear counter ready for POT reset screen
+		clr counter	
+		clear_datamem counterTimer							; clear counter ready for POT reset screen
+		speakerBeepFor speaker500
+		rcall randomizePotLocation 
 		rjmp endTimer1
 		contInitialCount:
 			addi temp, '0'
@@ -511,6 +517,9 @@ Timer1OVF: ;This is a countdown timer (16-bit)
 		ldii screenStage, stage_lose			; change to POT timeout
 		rjmp endTimer1
 		contPotResetFind:			;continues the countPotRestFind code
+
+			speakerBeepFor speaker250
+
 			cpii screenStage, stage_pot_find
 			brne countPotReset
 				;do_lcd_write_str str_findposition_msg
@@ -530,7 +539,8 @@ Timer1OVF: ;This is a countdown timer (16-bit)
 		pop yl
 		reti
 
-Timer3OVF:									; interrupt subroutine timer 2
+Timer3OVF:	
+performRandomLCG								; interrupt subroutine timer 2
 	push temp
 	push temp2
 	in temp, SREG
@@ -624,7 +634,39 @@ Timer3OVF:									; interrupt subroutine timer 2
 	pop temp
 	reti
 
+
+Timer4OVF:
+performRandomLCG
+	push temp
+	push temp2
+
+	in temp, PORTB
+	ldi temp2, 1
+	eor temp, temp2
+	out PORTB, temp	
+	;toggleStrobe
+
+	updateSoundCounter:
+
+	lds temp, speakerCounter
+	inc temp
+	sts speakerCounter, temp
+	
+	lds temp2, speakerCounterGoal 
+	cp temp, temp2
+	brne timer4Epilogue
+
+	toggle TIMSK4, 0
+	clr temp
+	sts speakerCounter, temp
+	
+	timer4Epilogue:
+	pop temp2
+	pop temp
+reti
+
 Timer2OVF: ;keypad loop
+performRandomLCG
 	push yl
 	push yh
 	push temp
@@ -825,8 +867,7 @@ compareCode:
 	inc curRound
 	clr counter
 	out PORTC, temp
-	out PORTG, temp
-
+	out PORTG, temp 
 
 	clr temp
 	out PORTE, temp
@@ -835,11 +876,14 @@ compareCode:
 	cpi curRound, (max_num_rounds) 
 	breq prepCodeEnter
 
+		speakerBeepFor speaker500
+
 		toggle TIMSK1, 1<<TOIE1
-		lds temp, ADCSRA 		;enable ADC
-		sbr temp, (ADSC + 1)   ;enable ADC
-		sts ADCSRA, temp      ;enable ADC
+
 		ldii screenStage, stage_pot_reset
+		clr counter
+		clear_datamem counterTimer
+
 		rjmp prologueTimer2
 
 	prepCodeEnter:
@@ -1015,6 +1059,34 @@ asciiconv:				;no need for ascii convert as digits show up as '*' (we need this 
 	pop r18
 	;pop r17
 	ret
+
+randomizePotLocation:
+	push temp
+	push temp2
+
+	pickRandPotVal:
+	lds temp2, randomPosition +1
+	lds cmask,  TCNT2	   				; this register used to hold LOW 8 bits of RAND number
+	lds rmask,  randomPosition         ; this register used to hold HIGH bits of RAND number
+	eor cmask, temp2
+	com temp2
+	eor rmask, temp2
+	andi rmask, 0b11
+	
+	ldi temp, high(pot_pos_max)
+	cpi cmask, low(pot_pos_max)
+	cpc rmask, temp
+	brsh pickRandPotVal
+
+	ldi temp, high(pot_pos_min)
+	cpi cmask, low(pot_pos_min)
+	cpc rmask, temp
+	brlo pickRandPotVal
+
+	pop temp2
+	pop temp
+
+ret
 
 ;;;;;;;LEAVE THIS HERE - NEEDS TO BE INCLUDED LAST!!!;;;;;;;
 .include "backlight.asm"
