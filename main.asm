@@ -69,6 +69,7 @@ gameloopTimer:			.byte 2	; counts number of timer overflows for gameloop
 counterTimer: 			.byte 2	; counts number of timer overflows for counter
 keypadTimer: 			.byte 2	; counts number of timer overflows for keypad
 randomcode: 			.byte max_num_rounds; stores the 3 'random' keypad items
+difficultySave:			.byte 1 ; the difficulty saved
 BacklightCounter: 		.byte 2 ; counts timer overflows
 BacklightSeconds: 		.byte 1	; counts number of seconds to trigger backlight fade out
 BacklightFadeCounter: 	.byte 1 ; used to pace the fade in process
@@ -190,7 +191,7 @@ RESET:
 	rcall initialiseBacklightTimer  ;;code for the backlight timer
 	
 	cleanAllReg
-	ldi difficultyCount, 20
+
 	ldii debounce, 1 ;to prevent reset after win or lose, automatically starting another game when clicking PB1
 
 	clear_datamem counterTimer
@@ -199,9 +200,26 @@ RESET:
 
 	do_lcd_write_str str_home_msg ;write home message to screen
 
-	do_lcd_show_custom 2, 0
+	lds difficultyCount, difficultySave
+ 	cpi difficultyCount, 15
+ 	brne Check10
+ 	do_lcd_show_custom 1, 5
+ 	rjmp endRestoreDifficulty
+ 	Check10:
+ 	cpi difficultyCount, 10
+ 	brne Check6
+ 	do_lcd_show_custom 1, 0
+ 	rjmp endRestoreDifficulty
+ 	Check6:
+ 	cpi difficultyCount, 6
+ 	brne Set20
+ 	do_lcd_show_custom 0, 6
+ 	rjmp endRestoreDifficulty
+	Set20:
+	ldi difficultyCount, 20
+ 	do_lcd_show_custom 2, 0
 
-
+	endRestoreDifficulty:
 	sei
 	
 halt:
@@ -677,6 +695,7 @@ convert:
 	winLoseReset:
 	cpii keyButtonPressed, 1
 	breq endConvert
+	sts difficultySave, difficultyCount
 	rjmp RESET
 
 	checkRemaindingStages:

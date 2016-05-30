@@ -35,7 +35,7 @@
 .macro disable_ADC
 	push temp
 	lds temp, ADCSRA 
-	cbr temp, (ADSC + 1)   ;disable ADC
+	cbr temp, (ADEN + 1)   ;disable ADC
 	sts ADCSRA, temp      ;disable ADC
 	pop temp
 .endmacro
