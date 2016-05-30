@@ -372,7 +372,7 @@ winFunc:
 	winloop:
 	toggleStrobe
 	rcall sleep_500ms
-	rcall winloop
+	rjmp winloop
 	endwinSeg: 
 	ret
 
