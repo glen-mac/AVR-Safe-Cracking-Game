@@ -234,6 +234,9 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 
 	winSeg:
 	ldii running, 0
+	toggle TIMSK1, 0
+	toggle TIMSK0, 0
+	do_lcd_write_str str_win_msg
 	rcall winFunc
 	rjmp endTimer0
 
@@ -365,15 +368,14 @@ codeEnterFunc:
 	ret
 	
 winFunc:
-	cpii screenStageFol, stage_win
-	breq endwinSeg
-	ldii screenStageFol, stage_win
-	do_lcd_write_str str_win_msg 
+	;cpii screenStageFol, stage_win
+	;breq endwinSeg
+	;ldii screenStageFol, stage_win
+	;do_lcd_write_str str_win_msg 
 	winloop:
 	toggleStrobe
 	rcall sleep_500ms
-	rjmp winloop
-	endwinSeg: 
+	rjmp winloop 
 	ret
 
 Timer1OVF: ;This is a countdown timer (16-bit)
@@ -452,7 +454,7 @@ Timer3OVF:									; interrupt subroutine timer 2
 	push temp
 	push r24
 	push r25
-
+	 
 	lds r24, BacklightFadeCounter						; load the backlight fade counter
 	inc r24									; increment the counter
 	sts BacklightFadeCounter, r24
