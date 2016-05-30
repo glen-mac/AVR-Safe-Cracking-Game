@@ -362,7 +362,11 @@ winFunc:
 	breq endwinSeg
 	ldii screenStageFol, stage_win
 	ldii running, 0 
-	do_lcd_write_str str_win_msg  
+	do_lcd_write_str str_win_msg 
+	winloop:
+	toggleStrobe
+	rcall sleep_500ms
+	rjmp winloop
 	endwinSeg:
 	ret
 
