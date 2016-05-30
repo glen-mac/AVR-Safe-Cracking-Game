@@ -173,6 +173,12 @@ RESET:
 		;disable some timers for the start stage
 		toggle TIMSK1, 0
 		toggle TIMSK4, 0
+
+		;reset the stack pointer
+		ldi temp, low(RAMEND) 
+		out SPL, temp
+		ldi temp, high(RAMEND)
+		out SPH, temp
 		
 		;clear things we NEED cleared
 		clr screenStage
