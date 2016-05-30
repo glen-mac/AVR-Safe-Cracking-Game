@@ -53,6 +53,12 @@ BacklightSeconds: 		.byte 1	; counts number of seconds to trigger backlight fade
 BacklightFadeCounter: 	.byte 1 ; used to pace the fade in process
 BacklightFade: 			.byte 1 ; flag indicating current backlight process - stable/fade in/fade out
 BacklightPWM: 			.byte 1 ; current backlight brightness
+
+; Speaker variables
+keypressCounter: .byte 1 						; number of loops so far
+finishedSoundCounter: .byte 1 					; number of beeps so far
+finishedBeepCounter: .byte 2 					; number of loops so far in a beep
+
 ;;;;;;;;;;;;VECTOR TABLE;;;;;;;;;;;;;;
 .cseg
 ;.org 0x0
@@ -228,6 +234,8 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 
 	winSeg:
 	rcall winFunc
+	toggleStrobe
+	rcall sleep_500ms
 	rjmp endTimer0
 
 	loseSeg:
@@ -358,15 +366,11 @@ codeEnterFunc:
 	ret
 	
 winFunc:
-	;cpii screenStageFol, stage_win
-	;breq endwinSeg
+	cpii screenStageFol, stage_win
+	breq endwinSeg
 	ldii screenStageFol, stage_win
 	ldii running, 0 
 	do_lcd_write_str str_win_msg 
-	winloop:
-	toggleStrobe
-	rcall sleep_500ms
-	rjmp winloop
 	endwinSeg:
 	ret
 
@@ -494,6 +498,9 @@ Timer3OVF:									; interrupt subroutine timer 2
 		sts OCR3BL, temp
 		
 	FadeFinished:						; if running the backlight should remain on
+	cpii running, 1						; check if game is in one of the running stages 
+	breq timer3Epilogue 
+	
 	lds r24, BacklightCounter				; load the backlight counter
 	lds r25, BacklightCounter+1
 	adiw r25:r24, 1							; increment the counter
@@ -517,8 +524,6 @@ Timer3OVF:									; interrupt subroutine timer 2
 	brne timer3Epilogue
 	clr temp							
 	sts BacklightSeconds, temp					; reset the seconds
-	cpii running, 1						; check if game is in one of the running stages 
-	breq timer3Epilogue 
 	fadeOutBacklight:						; start fading out the backlight
 		rcall backlightFadeOut
 	
