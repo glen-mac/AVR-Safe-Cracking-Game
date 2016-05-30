@@ -4,6 +4,27 @@
 ; Implement Sound
 ;
 ; Implement Strobe on win
+;countdownspeaker: 											; generates a 250ms beep - called when a keypress is successfully registered
+;	push temp
+;	clr temp										; initialise keypress counter
+;	sts speakerCounter, temp
+;
+;	speakerloop:
+;		lds temp, keypressCounter 					; loop 124 times
+;		inc temp
+;		sts speakerCounter, temp
+;		cpi temp, 124
+;		breq speakerEpilogue
+;
+;		sbi PORTB, 0  								; make sound
+;		rcall sleep_1ms
+;		cbi PORTB, 0
+;		rcall sleep_1ms
+;		rjmp speakerloop
+;
+;	speakerEpilogue:
+;	pop temp
+;	ret
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 .include "m2560def.inc"
