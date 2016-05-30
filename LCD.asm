@@ -1,8 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;; LCD CODE ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 .equ LCD_RS = 7
@@ -10,6 +9,7 @@
 .equ LCD_RW = 5
 .equ LCD_BE = 4
 
+;Set and clear functions
 .macro lcd_set
 	sbi PORTA, @0
 .endmacro
@@ -17,10 +17,7 @@
 	cbi PORTA, @0
 .endmacro
 
-;
-; Send a command to the LCD (r16)
-;
-
+;Stores a custom character into LCD memory
 lcd_store_custom:
 	push temp
 	push row
@@ -30,40 +27,40 @@ lcd_store_custom:
 
 	lcdStoreLoop:
 
-	ldi temp, (0b01 << 6)
-	mov row, col
-	mov rmask, temp2
+		ldi temp, (0b01 << 6)
+		mov row, col
+		mov rmask, temp2
 
-	andi rmask, 0b111
+		andi rmask, 0b111
 
-	lsl rmask
-	lsl rmask
-	lsl rmask
+		lsl rmask
+		lsl rmask
+		lsl rmask
 
-	andi row, 0b111
-	or rmask, row
-	or temp, rmask
+		andi row, 0b111
+		or rmask, row
+		or temp, rmask
 
-	rcall lcd_set_pos
+		rcall lcd_set_pos
 
-	lpm temp, Z+
-	andi temp, 0b00011111
+		lpm temp, Z+
+		andi temp, 0b00011111
 
+		rcall lcd_set_dat
 
-	rcall lcd_set_dat
+		inc col
 
-	inc col
+		cpi col, 8
+		brne lcdStoreLoop
 
-	cpi col, 8
-	brne lcdStoreLoop
+		pop rmask
+		pop col
+		pop row
+		pop temp
+ret
 
-	pop rmask
-	pop col
-	pop row
-	pop temp
-	ret
-
-
+;A function to set point in CG
+;RAM to store custom characters
 lcd_set_pos:
 	out PORTF, temp
 	lcd_clr LCD_RS
@@ -76,6 +73,9 @@ lcd_set_pos:
 	rcall sleep_1ms
 	ret
 
+;A function to store custom
+;character data in CG RAM
+;for our custom characters
 lcd_set_dat:
 	out PORTF, temp
 	lcd_clr LCD_RS
@@ -90,6 +90,7 @@ lcd_set_dat:
 	rcall sleep_1ms
 	ret
 
+;Sends a command to the LCD
 lcd_command:
 	push r16
 	out PORTF, r16
@@ -101,6 +102,7 @@ lcd_command:
 	pop r16
 	ret
 
+;Sends data to the LCD
 lcd_data:
 	push r16
 	out PORTF, r16
@@ -114,6 +116,7 @@ lcd_data:
 	pop r16
 	ret
 
+;Wait function for the LCD
 lcd_wait:
 	push r16
 	clr r16
@@ -121,6 +124,7 @@ lcd_wait:
 	out PORTF, r16
 	lcd_set LCD_RW
 
+;Wait Loop for the LCD
 lcd_wait_loop:
 	rcall sleep_1ms
 	lcd_set LCD_E

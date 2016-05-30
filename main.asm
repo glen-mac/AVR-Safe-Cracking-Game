@@ -10,13 +10,13 @@
 .equ INITCOLMASK		= 0xEF 	; scan from the rightmost column,
 .equ INITROWMASK		= 0x01 	; scan from the top row
 .equ ROWMASK			= 0x0F	; mask for the row
-.equ speaker250			= 61
-.equ speaker500			= 122
-.equ speaker1000		= 244
+.equ speaker250			= 61	; number of overflows for Timer4 to last 250ms
+.equ speaker500			= 122	; number of overflows for Timer4 to last 500ms
+.equ speaker1000		= 244	; number of overflows for Timer4 to last 1000ms
 .equ max_num_rounds		= 3		; the number of rounds that will be played
-.equ counter_initial	= 3		; the intial countdown value
-.equ pot_pos_min		= 22	; the minimum value on the pot
-.equ pot_pos_max		= 1004	; the maximum value on the pot
+.equ counter_initial	= 3		; the intial countdown value (3 seconds)
+.equ pot_pos_min		= 22	; the minimum value on the pot (got from testing it)
+.equ pot_pos_max		= 1004	; the maximum value on the pot (got from testing it)
 .equ stage_start		= 0		; |  The
 .equ stage_countdown	= 1		; |		stage
 .equ stage_pot_reset	= 2		; |			 values
@@ -26,7 +26,7 @@
 .equ stage_win 			= 6		; |	  we are
 .equ stage_lose 		= 7		; | on
 ;;;;;;;;;;;;REGISTER DEFINES;;;;;;;;;;;;
-.def debounce			= r2	; a flag debouncing PB1, when PB1 is clicked when the game is won or lost
+.def debounce			= r2	; a flag debouncing PB1, (used after PB1 is clicked when the game is won or lost - to ensure the game doesnt restart)
 .def screenStage		= r3	; the current stage the game is on
 .def screenStageFol 	= r4	; a delayed version of screenstage (for checking when it is desired that the initial stage code has already run)
 .def counter			= r5	; a generic countdown register
@@ -46,23 +46,19 @@
 gameloopTimer:			.byte 2	; counts number of timer overflows for gameloop
 counterTimer: 			.byte 2	; counts number of timer overflows for counter
 keypadTimer: 			.byte 2	; counts number of timer overflows for keypad
-randomcode: 			.byte max_num_rounds; stores the 3 'random' keypad items
+randomcode: 			.byte max_num_rounds; stores the 'random' keypad items
 BacklightCounter: 		.byte 2 ; counts timer overflows
 BacklightSeconds: 		.byte 1	; counts number of seconds to trigger backlight fade out
 BacklightFadeCounter: 	.byte 1 ; used to pace the fade in process
 BacklightFade: 			.byte 1 ; flag indicating current backlight process - stable/fade in/fade out
 BacklightPWM: 			.byte 1 ; current backlight brightness
-speakerCounter: 		.byte 1 ; number of loops so far
-speakerCounterGoal:		.byte 1 ; number of beeps so far
-randomPosition:			.byte 2
-
+speakerCounter: 		.byte 1 ; number of loops so far for the speaker timer
+speakerCounterGoal:		.byte 1 ; number of loops to do for the duration
+randomPosition:			.byte 2	; used for random number (LCG method - interrupts)
 ;;;;;;;;;;;;VECTOR TABLE;;;;;;;;;;;;;;
 .cseg
-;.org 0x0
 	jmp RESET
-;.org 0x2
 	jmp EXT_INT_R	; right push button
-;.org 0x4
 	jmp EXT_INT_L	; left push button
 .org OVF0addr
 	jmp Timer0OVF	; game loop
@@ -96,7 +92,10 @@ lcd_char_zero: 			.db		0x0E, 0x0A, 0x0A, 0x0E, 0x00, 0x00, 0x00, 0x00
 	
 RESET:
 	;;;;;;;;prepare STACK;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	reset_Stack
+	ldi temp, low(RAMEND) 
+	out SPL, temp
+	ldi temp, high(RAMEND)
+	out SPH, temp
   	;;;;;;;;prepare LCD;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	ser r16
 	out DDRF, r16 
@@ -128,7 +127,6 @@ RESET:
 	out TCCR0A, temp
 	sts TCCR1A, temp
 	sts TCCR2A, temp
-	;sts TCCR3A, temp
 	sts TCCR4A, temp
 	ldi temp, (1<<CS01)
 	out TCCR0B, temp
@@ -144,20 +142,20 @@ RESET:
 	toggle TIMSK2, 1<<TOIE2  ;timer for difficulty
 	toggle TIMSK3, 1<<TOIE3
 	;;;;;;;;prepare MISC;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-  	ldi temp, PORTLDIR 	;KEYPAD
+  	ldi temp, PORTLDIR 		;KEYPAD
 	sts DDRL, temp
-	ldi temp, 0b00011000  ; set PORTE (pins 3&4) to output (Backlight = 4, Motor = 3)
-	out DDRE, temp
+	ldi temp, 0b00011000  	;set PORTE (pins 3&4) to output (Backlight = 4, Motor = 3)
+	out DDRE, temp		
 	ldi temp, 0xFF
-	out DDRC, temp	;PORTC is for LED bar
-	out DDRG, temp	;PORTG is for LED bar (top 2 LEDs)
+	out DDRC, temp			;PORTC is for LED bar
+	out DDRG, temp			;PORTG is for LED bar (top 2 LEDs)
 	ldi temp, 1
-	out DDRB, temp
-	ldi temp, 0b00010000	;	pin position 3 is motor, 4 is LCD									
-	out PORTE, temp	
+	out DDRB, temp			;PORTB is for the speaker
+	ldi temp, 0b00010000	;pin position 3 is motor, 4 is LCD									
+	out PORTE, temp			;PORTE is for the motor and backlight
 	clr temp
-	out PORTC, temp  ;BLANK the LED bar
-	out PORTG, temp  ;BLANK the top LEDs on LED bar
+	out PORTC, temp  		;BLANK the LED bar
+	out PORTG, temp 		;BLANK the top LEDs on LED bar
 	out PORTB, temp
 		
 	ldi temp, (1 << REFS0) | (0 << ADLAR) | (0 << MUX0);     Set ADC reference to AVCC
@@ -169,15 +167,14 @@ RESET:
 
 	rcall initialiseBacklightTimer  ;;code for the backlight timer
 	
-	cleanAllReg
+	cleanAllReg	;clean the registers (clean slate)
 
 	gameRestart:
-
-		reset_Stack
-
+		;disable some timers for the start stage
 		toggle TIMSK1, 0
 		toggle TIMSK4, 0
-
+		
+		;clear things we NEED cleared
 		clr screenStage
 		clr screenStageFol
 		clr counter
@@ -187,49 +184,59 @@ RESET:
 		out PORTC, counter
 		out PORTG, counter
 
+		;ensure strobe light is off
 		in temp, PORTA
 		andi temp, 0xFD
 		out PORTA, temp	
 
-		ldii debounce, 1 ;to prevent reset after win or lose, automatically starting another game when clicking PB1
+		;to prevent another game starting after win or lose, 
+		;automatically starting another game when clicking PB1 (bad)
+		ldii debounce, 1 
 
+		;clear data memory
 		clear_datamem counterTimer
 		clear_datamem gameloopTimer
 		clear_datamem keypadTimer
 		clear_datamem randomcode
 		clear_datamem speakerCounter
 
-		do_lcd_write_str str_home_msg ;write home message to screen
-		do_lcd_command 0b11001111
-		do_lcd_data_i 3
+		do_lcd_write_str str_home_msg 	;write home message to screen
+		do_lcd_command 0b11001111		;move cursor to end of bottom row
+		do_lcd_data_i 3					;draw custom character (smiley face :) )
 
-	;lds difficultyCount, difficultySave
- 	cpi difficultyCount, 15
- 	brne Check10
- 	do_lcd_show_custom 1, 5
- 	rjmp endRestoreDifficulty
- 	Check10:
- 	cpi difficultyCount, 10
- 	brne Check6
- 	do_lcd_show_custom 1, 0
- 	rjmp endRestoreDifficulty
- 	Check6:
- 	cpi difficultyCount, 6
- 	brne Set20
- 	do_lcd_show_custom 0, 6
- 	rjmp endRestoreDifficulty
-	Set20:
-	ldi difficultyCount, 20
- 	do_lcd_show_custom 2, 0
-	endRestoreDifficulty:
-
+		;check our previous value for difficulty count
+		;(only works for 15, 10, 6 and will default to 20 otherwise)
+ 		Check15:
+			cpi difficultyCount, 15
+ 			brne Check10
+ 			do_lcd_show_custom 1, 5
+ 			rjmp endRestoreDifficulty
+ 		Check10:
+ 			cpi difficultyCount, 10
+ 			brne Check6
+ 			do_lcd_show_custom 1, 0
+ 			rjmp endRestoreDifficulty
+ 		Check6:
+ 			cpi difficultyCount, 6
+ 			brne Set20
+ 			do_lcd_show_custom 0, 6
+ 			rjmp endRestoreDifficulty
+		Set20:
+			ldi difficultyCount, 20
+ 			do_lcd_show_custom 2, 0
+			endRestoreDifficulty:
 	sei
 	
 halt:
-	rjmp halt ;do nothing forever!
+	rjmp halt
+
+
 
 Timer0OVF: ;This is an 8-bit timer - Game loop.
-performRandomLCG
+
+	performRandomLCG
+
+	;timer prologue
 	push yl
 	push yh
 	push temp
@@ -241,14 +248,15 @@ performRandomLCG
 	ldi temp, high(781)
 	cpi yl, low(781)
 	cpc yh, temp
-	breq contTimer0
+	breq continueTimer0
 	rjmp endTimer0
 
-	contTimer0:
+	continueTimer0:
 
-	clr debounce	;clear debounce flag
-	clear_datamem gameloopTimer
+	clr debounce  				 ;clear debounce flag
+	clear_datamem gameloopTimer  ;clear the counter
 
+	;switch case for stage select
 	cpii screenStage, stage_countdown
 	breq countdownSeg
 	cpii screenStage, stage_pot_reset
@@ -298,12 +306,13 @@ performRandomLCG
 	pop temp
 	pop yh
 	pop yl
-	reti
+reti
 
 countdownFunc:
-	cpii screenStageFol, stage_countdown
-	breq endcountdownSeg
-	ldii running, 1
+	cpii screenStageFol, stage_countdown 
+	breq endCountdownFunc
+	ldii running, 1	;backlight should be on
+	ldii screenStageFol, stage_countdown 
 	do_lcd_write_str str_countdown_msg
 	ldi temp, 3
 	addi temp, '0'
@@ -311,158 +320,149 @@ countdownFunc:
 	do_lcd_data_i '.'
 	do_lcd_data_i '.'
 	do_lcd_data_i '.'
-	toggle TIMSK1, 1<<TOIE1
-	ldii screenStageFol, stage_countdown
-	endcountdownSeg:
-	ret
+	toggle TIMSK1, 1<<TOIE1 ;countdown timer needs to be on
+	endCountdownFunc:
+ret
 
 potResetFunc:
 	cpii screenStageFol, stage_pot_reset
-	brne sdfsdfsdfsd
-	rjmp endpotResetSeg
-	;breq endpotResetSeg
+	brne continuePotResetFunc
+	rjmp endPotResetFunc
 
-	sdfsdfsdfsd:
+	continuePotResetFunc:
 
-	ldii running, 1 
-	enable_ADC
+;	ldii running, 1 ;backlight should be on
+	ldii screenStageFol, stage_pot_reset
+	enable_ADC		;ADC should be on
 
-	do_lcd_write_str str_reset_msg ;this is the reset pot message?
-	do_lcd_command 0b11001011
+	do_lcd_write_str str_reset_msg 
+	do_lcd_command 0b11001011 ;move cursor on screen (to write countdown)
 
 	mov temp, difficultyCount
 	sub temp, counter
-	rcall asciiconv
-	ldii screenStageFol, stage_pot_reset
-	lds temp, ADCSRA      ;enable ADC
-	ori temp, (1 << ADSC) ;enable ADC
-	sts ADCSRA, temp      ;enable ADC
-	clr row 				; this register used to ensure RESET position is helf for 500ms
-	clr col					; this register used to counter amount of times row has been seen to
+	rcall asciiconv	;write countdown on screen
+    
+	clr row 				; this register used to ensure RESET position is held for 500ms
+	clr col					; this register used to count amount of times row has been seen to ->
 							; be one (obviously after checking twice in 500ms intervals it is RESET)
 
-	;lds temp, speakerNewRound
-	;;cpi temp, 1
-	;brne endpotResetSeg
-	;speakerBeepFor speaker500
-	;sts speakerNewRound, col
-
-	endpotResetSeg:
-		cpi row, 1
-		breq incRESETpotCount	;BRNE out of range, so a quick fix
+	endPotResetFunc:
+		cpi row, 1				; is the pot still in reset position?
+		breq incrementResetPotCount
 		clr col
 		ret
-		incRESETpotCount:
-			inc col ;numbers of times you have seen row as 1
-			ldi temp, 5
+		incrementResetPotCount:
+			inc col 			; numbers of times seen row as 1
+			ldi temp, 5			; has it been 5 x 100ms?
 			cp col, temp
-			brne endincRESETpotCount
+			brne endIncrementResetPotCount
 			ldii screenStage, stage_pot_find
-			endincRESETpotCount:
-	ret
+		endIncrementResetPotCount:
+ret
 
 potFindFunc:
 	cpii screenStageFol, stage_pot_find
-	breq endpotFindSeg
-	ldii running, 1 
+	breq endPotFindFunc
+	;ldii running, 1  					;backlight should be on
+	ldii screenStageFol, stage_pot_find	
 	do_lcd_write_str str_findposition_msg ;this is the reset pot message?
-	do_lcd_command 0b11001011
+	do_lcd_command 0b11001011	; move cursor so countdown can be written
+	
 	mov temp, difficultyCount
 	sub temp, counter
 	rcall asciiconv
-	ldii screenStageFol, stage_pot_find
-
-
-	clr row 			    ; this register used to ensure FIND position is helf for 500ms
-	clr col					; this register used to counter amount of times row has been seen to
+	
+	clr row 			    ; this register used to ensure FIND position is held for 500ms
+	clr col					; this register used to count amount of times row has been seen to ->
 							; be one (obviously after checking twice in 500ms intervals it is FOUND)
-	endpotFindSeg:
-		cpi row, 1
-		breq incFINDpotCount	;BRNE out of range, so a quick fix
+	endPotFindFunc:
+		cpi row, 1 			; is the pot still in reset position?
+		breq incrementFindPotCount	
 		clr col
 		ret
-		incFINDpotCount:
-			inc col ;numbers of times you have seen row as 1
-			ldi temp, 10
+		incrementFindPotCount:
+			inc col			 ;numbers of times  seen row as 1
+			ldi temp, 10	 ;has it been 1s?
 			cp col, temp
-			brne endincFINDpotCount
+			brne endIncrementFindPotCount
 			ldii screenStage, stage_code_find
-			endincFINDpotCount:
-	ret
+		endIncrementFindPotCount:
+ret
 
 codeFindFunc:
 	cpii screenStageFol, stage_code_find
 	brne continueCodeFindFunc
-	rjmp endcodeFindSeg
+	rjmp endCodeFindFunc
 
 	continueCodeFindFunc:
 
-	ldii running, 1 
-	
+	;ldii running, 1 ;backlight should be on
+	ldii screenStageFol, stage_code_find
+
+	disable_ADC
+
 	rcall randomizePotLocation
 
 	toggle TIMSK1, 0 ;disable countdown
-	ldii screenStageFol, stage_code_find
+
 	do_lcd_write_str str_keypadscan_msg
-
-	disable_ADC
 	
-	lds keypadCode, TCNT3L
-	andi keypadCode, 0b1111
+	lds keypadCode, TCNT3L		
+	andi keypadCode, 0b1111		;take low 4 bits of timer as keypad button (random)
 
-	clr counter	;clear counter to count timers the correct button was held
+	clr counter	;clear counter (for new round)
 
-	endcodeFindSeg:
-	ret
+	endCodeFindFunc:
+ret
 
 codeEnterFunc:
 	cpii screenStageFol, stage_code_enter
-	breq endcodeEnterSeg
-	ldii running, 1 
+	breq endCodeEnterFunc
+	;ldii running, 1 ;backlight sh
 	ldii screenStageFol, stage_code_enter
 	do_lcd_write_str str_entercode_msg
 
 	clr counter	;clear counter to count number of button presses to index memory in data seg
 
-	endcodeEnterSeg:
-	ret
+	endCodeEnterFunc:
+ret
 	
 winFunc:
 	cpii screenStageFol, stage_win
-	breq prologuewinSeg
-	clr running
+	breq epilogueWinFunc
+	clr running					;backlight should begin to fade out
 	ldii screenStageFol, stage_win
-	toggle TIMSK1, 0
-	speakerBeepFor speaker1000
+	toggle TIMSK1, 0			;turn off countdown timer
+	disable_ADC					;disable adc
+	speakerBeepFor speaker1000	;make some noise!!
 	do_lcd_write_str str_win_msg
-	clr counter
-	prologuewinSeg:
+	clr counter					;clear counter for use in the flashing below
+	epilogueWinFunc:
 		inc counter
 		cpii counter, 5
-		brne endwinSeg
-		toggleStrobe
+		brne endWinFunc
+		toggleStrobe			;toggle strobe at 2hz
 		clr counter
-	endwinSeg: 
-	ret
+	endWinFunc: 
+ret
 
 loseFunc:
 	cpii screenStageFol, stage_lose
-	breq prologueloseSeg
-	clr running
-	speakerBeepFor speaker1000
+	breq endLoseFunc
+	clr running 				;backlight should begin to fade out
+	speakerBeepFor speaker1000  ;make some noise :(
 	ldii screenStageFol, stage_lose
-	toggle TIMSK1, 0
-	disable_ADC
+	toggle TIMSK1, 0			;turn off countdown timer
+	disable_ADC 				;disable adc
 	ldi temp, 0
-	out PORTC, temp
-	out PORTG, temp
+	out PORTC, temp				;turn off LED lights
+	out PORTG, temp				;turn off LED lights
 	do_lcd_write_str str_timeout_msg
-	prologueloseSeg:
-	ret
+	endLoseFunc:
+ret
 
 Timer1OVF: ;This is a countdown timer (16-bit)
-performRandomLCG
-	;performRandomLCG
+	performRandomLCG
 	push yl
 	push yh
 	push temp
@@ -474,11 +474,11 @@ performRandomLCG
 	ldi temp, high(30)
 	cpi yl, low(30)
 	cpc yh, temp
-	breq timer1Second
+	breq continueTimer1
 	rjmp endTimer1		; fix for out of range branch
 
-	timer1Second:
-		inc counter
+	continueTimer1:
+		inc counter		;it has been 1 second
 		clear_datamem counterTimer
 
 	cpii screenStage, stage_countdown
@@ -492,12 +492,12 @@ performRandomLCG
 	countInitialCount:
 		ldi temp, counter_initial
 		sub temp, counter
-		cpi temp, 0
+		cpi temp, 0								;find time remaining
 		brne contInitialCount
-		ldii screenStage, stage_pot_reset		; change to POT reset screen
+		ldii screenStage, stage_pot_reset		;change to POT reset screen
 		clr counter	
-		clear_datamem counterTimer							; clear counter ready for POT reset screen
-		speakerBeepFor speaker500
+		clear_datamem counterTimer				;clear counter ready for POT reset screen
+		speakerBeepFor speaker500				;beeeeeeeeeep
 		rcall randomizePotLocation 
 		rjmp endTimer1
 		contInitialCount:
@@ -514,33 +514,31 @@ performRandomLCG
 		sub temp, counter
 		cpi temp, 0
 		brne contPotResetFind
-		ldii screenStage, stage_lose			; change to POT timeout
+		ldii screenStage, stage_lose	; change to POT timeout
 		rjmp endTimer1
 		contPotResetFind:			;continues the countPotRestFind code
 
-			speakerBeepFor speaker250
+			speakerBeepFor speaker250	;beep on decrement
 
 			cpii screenStage, stage_pot_find
 			brne countPotReset
-				;do_lcd_write_str str_findposition_msg
 				do_lcd_command 0b11001011
-				rjmp Timer1prologue
+				rjmp epilogueTimer1
 			countPotReset:
-				;do_lcd_write_str str_reset_msg
 				do_lcd_command 0b11001011
-				rjmp Timer1prologue
+				rjmp epilogueTimer1
 
-	Timer1prologue:
+	epilogueTimer1:
 		rcall asciiconv
 		rjmp endTimer1
 	endTimer1:
 		pop temp
 		pop yh
 		pop yl
-		reti
+reti
 
 Timer3OVF:	
-performRandomLCG								; interrupt subroutine timer 2
+	performRandomLCG							
 	push temp
 	push temp2
 	in temp, SREG
@@ -549,19 +547,19 @@ performRandomLCG								; interrupt subroutine timer 2
 	push r25
 	 
 	lds r24, BacklightFadeCounter				; load the backlight fade counter
-	inc r24									; increment the counter
+	inc r24										; increment the counter
 	sts BacklightFadeCounter, r24
-	cpi r24, 15							; check if has been 0.5sec/0xFF
+	cpi r24, 15									
 	brne fadeFinished
 	
-	clr temp								; reset fade counter
+	clr temp									; reset fade counter
 	sts BacklightFadeCounter, temp	
 
 	lds temp, BacklightFade						; check what fade state
 	cpi temp, LCD_BACKLIGHT_FADEIN
 	breq FadeIn
 	cpi temp, LCD_BACKLIGHT_FADEOUT
-	breq FadeOut							;if BacklightFade = 0 which is the case when it is first set up
+	breq FadeOut							; if BacklightFade = 0 which is the case when it is first set up
 	rjmp fadeFinished 
 
 	FadeIn:									; if fading in
@@ -577,7 +575,7 @@ performRandomLCG								; interrupt subroutine timer 2
 		cpi temp2, 0x00						; check if min brightness
 		breq lcdBacklightReached
 		dec temp2							; dec pwm
-		sts BacklightPWM, temp2				;store new pwm
+		sts BacklightPWM, temp2				; store new pwm
 		rjmp dispLCDBacklight
 
 	lcdBacklightReached:
@@ -585,78 +583,75 @@ performRandomLCG								; interrupt subroutine timer 2
 		sts BacklightFade, temp
 		rjmp endFadeCode
 
-	dispLCDBacklight:
+	dispLCDBacklight:						; store backlight
 		lds temp, BacklightPWM
 		sts OCR3BL, temp
 	
 	endFadeCode:
-		clr temp									; reset the backlight counter
+		clr temp							; reset the backlight counter
 		sts BacklightSeconds, temp
 		sts BacklightCounter, temp
 		sts BacklightCounter+1, temp
 		
-	fadeFinished:						; if running the backlight should remain on
+	fadeFinished:							; if running the backlight should remain on
 	
-	cpii running, 1						; check if game is in one of the running stages 
-	breq timer3Epilogue 
+		cpii running, 1							; check if game is in one of the running stages 
+		breq timer3Epilogue 
 	
-	lds r24, BacklightCounter				; load the backlight counter
-	lds r25, BacklightCounter+1
-	adiw r25:r24, 1							; increment the counter
-	sts BacklightCounter, r24				; store new values
-	sts BacklightCounter+1, r25
+		lds r24, BacklightCounter				; load the backlight counter
+		lds r25, BacklightCounter+1
+		adiw r25:r24, 1							; increment the counter
+		sts BacklightCounter, r24				; store new values
+		sts BacklightCounter+1, r25
 
-	ldi temp, high(3906)
-	cpi r24, low(3906)						; check if it has been 1 second
-	cpc r25, temp
-	brne timer3Epilogue
+		ldi temp, high(3906)
+		cpi r24, low(3906)						; check if it has been 1 second
+		cpc r25, temp
+		brne timer3Epilogue
 
-	clear_datamem BacklightCounter
+		clear_datamem BacklightCounter
 
-	lds r24, BacklightSeconds				; load backlight seconds
-	inc r24									; increment the backlight seconds
-	sts BacklightSeconds, r24				; store new value
+		lds r24, BacklightSeconds				; load backlight seconds
+		inc r24									; increment the backlight seconds
+		sts BacklightSeconds, r24				; store new value
 
-	cpi r24, 5								; check if it has been 5 seconds
-	brne timer3Epilogue
-	clr temp							
-	sts BacklightSeconds, temp					; reset the seconds
+		cpi r24, 5								; check if it has been 5 seconds
+		brne timer3Epilogue
+		clr temp							
+		sts BacklightSeconds, temp					; reset the seconds
 
 	fadeOutBacklight:						; start fading out the backlight
 		rcall backlightFadeOut
 	
 	timer3Epilogue:
-	pop r25
-	pop r24
-	pop temp
-	out SREG, temp
-	pop temp2
-	pop temp
-	reti
+		pop r25
+		pop r24
+		pop temp
+		out SREG, temp
+		pop temp2
+		pop temp
+reti
 
 
-Timer4OVF:
-performRandomLCG
+Timer4OVF:	;used for the speaker sounds
+	performRandomLCG
 	push temp
 	push temp2
 
-	in temp, PORTB
+	in temp, PORTB		;pull in speaker pin
 	ldi temp2, 1
-	eor temp, temp2
+	eor temp, temp2		;toggle speaker pin
 	out PORTB, temp	
-	;toggleStrobe
-
-	updateSoundCounter:
 
 	lds temp, speakerCounter
 	inc temp
 	sts speakerCounter, temp
 	
-	lds temp2, speakerCounterGoal 
+	lds temp2, speakerCounterGoal ;have i reached my tone length?
 	cp temp, temp2
 	brne timer4Epilogue
 
-	toggle TIMSK4, 0
+	toggle TIMSK4, 0		;yes i have, turn me off
 	clr temp
 	sts speakerCounter, temp
 	
@@ -666,7 +661,10 @@ performRandomLCG
 reti
 
 Timer2OVF: ;keypad loop
-performRandomLCG
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;KEYPAD LOGIC;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	performRandomLCG
 	push yl
 	push yh
 	push temp
@@ -679,15 +677,12 @@ performRandomLCG
 	ldi temp, high(390)
 	cpi yl, low(390)
 	cpc yh, temp
-	breq contTimer2
+	breq continueTimer2
 	rjmp endTimer2
 
-	contTimer2:
+	continueTimer2:
 
 	clear_datamem keypadTimer
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;KEYPAD LOGIC;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	push col
 	push row
 	push rmask
@@ -699,21 +694,24 @@ performRandomLCG
 	clr temp
 	clr temp2
 	ldi cmask, INITCOLMASK ; initial column mask
+
 colloop:
 	cpi col, 4
 	brne contColloop; If all keys are scanned, repeat.
 	
+	;all keys were scanned, and nothing found...
 	cpii screenStageFol, stage_code_find
 	breq motorKill
-	clr keyButtonPressed
-	rjmp prologueTimer2
-	motorKill:
-	clr temp
-	out PORTE, temp
-	clr counter
- 	rjmp prologueTimer2
+		clr keyButtonPressed	;deal with debouncing
+		rjmp epilogueTimer2
+	motorKill:					;if on code find, handle the motor stopping
+		in temp, PORTE
+		andi temp, 0b11110111	;kill off motor pin
+		out PORTE, temp
+		clr counter				;restart holding counter
+ 		rjmp epilogueTimer2
 	
-	contColloop:
+contColloop:
 	sts PORTL, cmask; Otherwise, scan a column.
 	ldi temp, 0xFF	; Slow down the scan operation.
 delay:
@@ -739,8 +737,9 @@ nextcol: ; if row scan is over
 	inc col ; increase column value
 	rjmp colloop
 convert:	
-	rcall backlightFadeIn			;;initialise the backlight to begin to fade in
+	rcall backlightFadeIn	;initialise the backlight to begin to fade in
 
+	;find button pushed..
 	mov temp, row 
 	lsl temp
 	lsl temp
@@ -751,11 +750,11 @@ convert:
 	cpii screenStage, stage_lose
 	brne checkRemaindingStages
 
+	;when at win/lose screen and a button was pushed...
 	winLoseReset:
-	cpii keyButtonPressed, 1
-	breq endConvert
-	;sts difficultySave, difficultyCount
-	rjmp gameRestart
+		cpii keyButtonPressed, 1
+		breq endConvert
+		rjmp gameRestart
 
 	checkRemaindingStages:
 	
@@ -772,126 +771,130 @@ convert:
 	rjmp keypadCodeEnter
 
 	endConvert:
-	rjmp prologueTimer2
+	rjmp epilogueTimer2
+
 setDifficulty:	
-	A:
-	cpi temp, 3 ;A
-	brne B
-	ldi difficultyCount, 20
-	do_lcd_show_custom 2, 0
-	rjmp prologueTimer2
-	B:
-	cpi temp, 7 ;B
-	brne C
-	ldi difficultyCount, 15
-	do_lcd_show_custom 1, 5
-	rjmp prologueTimer2
-	C:
-	cpi temp, 11 ;C
-	brne D
-	ldi difficultyCount, 10
-	do_lcd_show_custom 1, 0
-	rjmp prologueTimer2
-	D:	
-	cpi temp, 15 ;D	
-	brne performJMPtimer2End				
-	ldi difficultyCount, 6
-	do_lcd_show_custom  0, 6
+	Akey:
+		cpi temp, 3 ;A
+		brne Bkey
+		ldi difficultyCount, 20
+		do_lcd_show_custom 2, 0
+		rjmp epilogueTimer2
+	Bkey:
+		cpi temp, 7 ;B
+		brne Ckey
+		ldi difficultyCount, 15
+		do_lcd_show_custom 1, 5
+		rjmp epilogueTimer2
+	Ckey:
+		cpi temp, 11 ;C
+		brne Dkey
+		ldi difficultyCount, 10
+		do_lcd_show_custom 1, 0
+		rjmp epilogueTimer2
+	Dkey:	
+		cpi temp, 15 ;D	
+		brne performJMPtimer2End				
+		ldi difficultyCount, 6
+		do_lcd_show_custom  0, 6
 
 	performJMPtimer2End:
-	rjmp prologueTimer2	
+		rjmp epilogueTimer2	
 
 keypadCodeEnter:
-
 	cpii keyButtonPressed, 1
-	brne enterKey
-	rjmp prologueTimer2
+		brne enterKey
+		rjmp epilogueTimer2
 
 	enterKey:
 	
-	clr cmask
-	ldi yl, low(randomcode)
-	ldi yh, high(randomcode)
-	add yl, counter
-	adc yh, cmask ;assuming number of rounds doesn't exceed 255...
+		clr cmask
+		ldi yl, low(randomcode) ;get the data memory for the consecutive stored keys
+		ldi yh, high(randomcode)
+		add yl, counter
+		adc yh, cmask ;assuming number of rounds doesn't exceed 255...
 
-	ld temp2, Y
+		ld temp2, Y
 
-	cp temp, temp2
-	breq correctKey
-	clr counter
-	do_lcd_write_str str_entercode_msg
-	rjmp prologueTimer2
+		cp temp, temp2
+		breq correctKey	;the correct key was entered
+		clr counter
+		do_lcd_write_str str_entercode_msg
+		rjmp epilogueTimer2
 
 	correctKey:
-		
-		inc counter		
+			
+		inc counter						;increment number of correct keys
 
-		do_lcd_data_i '*'
+		do_lcd_data_i '*'				;draw correct key on screen
 
-		ldii keyButtonPressed, 1
+		ldii keyButtonPressed, 1		;debouncing..
 
-		cpii counter, max_num_rounds
+		cpii counter, max_num_rounds	;check if this is the last key
 		brne endkeypadCodeEnter
 
-		ldii screenStage, stage_win
+		ldii screenStage, stage_win		;yay we win!!
 
 		endkeypadCodeEnter:
-		rjmp prologueTimer2
+			rjmp epilogueTimer2
 
 compareCode:
+	cp temp, keypadCode		;check if the key entered was the correct one
+		breq codeMatches
+		;otherwise...
+		clr counter
+		rjmp epilogueTimer2
 
-	cp temp, keypadCode
-	breq codeMatches
-	clr counter
-
-	rjmp prologueTimer2
 	codeMatches:
 
-	inc counter
+		inc counter
+	
+		;turn on the motor
+		in temp, PORTE	
+		ori temp, (1 << 3)
+		out PORTE, temp
 
-	in temp, PORTE
-	ori temp, (1 << 3)
-	out PORTE, temp
+		cpii counter, 20	;key has been held for 1 second
+			brne epilogueTimer2
 
-	cpii counter, 20
-	brne prologueTimer2
+		;store the correct key entered into data memory to check later..
+		clr temp
+		ldi yl, low(randomcode)
+		ldi yh, high(randomcode)
+		add yl,	curRound
+		adc yh, temp          ;unless rounds exceeds 255....
+		st Y,  keypadCode
 
-	clr temp
-	ldi yl, low(randomcode)
-	ldi yh, high(randomcode)
-	add yl,	curRound
-	adc yh, temp          ;unless rounds exceeds 255....
-	st Y,  keypadCode
+		;increment current round and clear some stuff..
+		inc curRound
+		clr counter
+		out PORTC, temp
+		out PORTG, temp 
 
-	inc curRound
-	clr counter
-	out PORTC, temp
-	out PORTG, temp 
+		;kill the motor for good
+		in temp, PORTE
+		andi temp, 0b11110111	;kill off motor pin
+		out PORTE, temp
+		ldii screenStageFol, -1 ;just a prevent method, so that motor doesn't run when the view changes 
 
-	clr temp
-	out PORTE, temp
-	ldii screenStageFol, -1 ;just a prevent set, so that motor doesn't run when the view changes 
+		cpi curRound, (max_num_rounds) ;is the game over yet?
+		breq prepCodeEnter			
 
-	cpi curRound, (max_num_rounds) 
-	breq prepCodeEnter
+		speakerBeepFor speaker500		;beeeep
 
-		speakerBeepFor speaker500
-
-		toggle TIMSK1, 1<<TOIE1
+		toggle TIMSK1, 1<<TOIE1			;enable countdown timer
 
 		ldii screenStage, stage_pot_reset
-		clr counter
-		clear_datamem counterTimer
+		clr counter					;clear timer stuff
+		clear_datamem counterTimer	;clear timer stuff
 
-		rjmp prologueTimer2
+		rjmp epilogueTimer2
 
 	prepCodeEnter:
-	ldii screenStage, stage_code_enter
-	ldii keyButtonPressed, 1
-	rjmp prologueTimer2
+		ldii screenStage, stage_code_enter  ;go to code enter screen
+		ldii keyButtonPressed, 1 ;debouncing
 
-prologueTimer2:
+epilogueTimer2:
 	pop temp2
 	pop cmask
 	pop rmask
@@ -901,37 +904,37 @@ endTimer2:
 	pop temp
 	pop yh
 	pop yl
-	reti
+reti
 	
-EXT_INT_R:	
+EXT_INT_R:	;right push button
 	rcall backlightFadeIn
 	cpii screenStage, stage_start ;check if on start screen
-	breq preEndRestartButton
-	rjmp gameRestart
+		breq preEndRestartButton
+		rjmp gameRestart
 	preEndRestartButton:
-	reti
+reti
 
-EXT_INT_L:
-	cpii debounce, 0
-	brne preEndInt
-	rcall backlightFadeIn
+EXT_INT_L:	;left push button
+	cpii debounce, 0 ;debouncing so game doesn't start itself
+		brne endExtIntL
+		rcall backlightFadeIn
 	cpii screenStage, stage_start ;check if on start screen
-	brne checkStageWin
-	ldii screenStage, stage_countdown
-	rjmp preEndInt
+		brne checkStageWin
+		ldii screenStage, stage_countdown ;if we are, start countdown
+		rjmp endExtIntL
 
 	checkStageWin:
-	cpii screenStage, stage_win
-	brne checkStageLose
-	rjmp gameRestart
+		cpii screenStage, stage_win  ;check if on win screen
+			brne checkStageLose
+			rjmp gameRestart
 
 	checkStageLose:
-	cpii screenStage, stage_lose
-	brne preEndInt
-	rjmp gameRestart	
+		cpii screenStage, stage_lose	;check if on lose screen
+			brne endExtIntL
+			rjmp gameRestart
 
-	preEndInt:
-	reti
+	endExtIntL:
+reti
 
 handleADC:
 	push temp
@@ -940,6 +943,7 @@ handleADC:
 	push temp2
 	push col
 
+	;read from ADC
 	lds temp2, ADCL 
   	lds temp, ADCH
 
@@ -947,15 +951,15 @@ handleADC:
 		brne checkIfPotFind
 		ldi rmask, high(pot_pos_min)
 		cpi temp2, low(pot_pos_min)
-		cpc temp, rmask
+		cpc temp, rmask		;are we less than the min?
 		brge clrRowPreEndADC
-		ldi row, 1		; this means that RESET is being held
+		ldi row, 1			; this means that RESET is being held
 		rjmp endHandleADC
 		clrRowPreEndADC:
 			clr row
 			rjmp endHandleADC
 
-	checkIfPotFind:
+	checkIfPotFind: ;since we arent on reset pot screen, check if we are on pot find screen
 
 	cpii screenStageFol, stage_pot_find  ;cmask is LOW bits, rmask is HIGH bits
 		breq performPotFind
@@ -963,23 +967,23 @@ handleADC:
 
 		performPotFind:
 
-		clr col ;boolean for adc is higher to check bounds so we cna lose game
+		clr col ;boolean for 'adc is higher' to check bounds so we can lose game :(
 
 		cp temp2, cmask
 		cpc temp, rmask
 		brlo adcIsLower
 		rjmp adcIsHigher
-		adcIsLower:	
+		adcIsLower:		;adc is higher than target
 			sub cmask, temp2
 			sbc rmask, temp	
 			rjmp checkBelow16
-		adcIsHigher:
+		adcIsHigher:	;adc is lower than target
 			sub temp2, cmask
 			sbc temp, rmask
 			mov cmask, temp2
 			mov rmask, temp
 			ldi col, 1
-		checkBelow16:
+		checkBelow16:	;check if within 16 adc counts
 			ldi temp, high(17)
 			cpi cmask, low(17)
 			cpc rmask, temp
@@ -988,8 +992,8 @@ handleADC:
 			ldi temp, 0b11	;for LED
 			ldi row, 1		; this means that POSITION is being held
 			rjmp endCheckIfPotFind
-		checkBelow32:
-			clr row			; clear flag (which says we are within 16 ADC)
+		checkBelow32:	;check if within 32 adc counts
+			clr row		; clear flag (which says we are within 16 ADC)
 			ldi temp, high(33)
 			cpi cmask, low(33)
 			cpc rmask, temp
@@ -997,7 +1001,7 @@ handleADC:
 			ldi temp2, 0xFF
 			ldi temp, 0b01
 			rjmp endCheckIfPotFind
-		checkBelow48:
+		checkBelow48:	;check if within 48 adc counts
 			ldi temp, high(49)
 			cpi cmask, low(49)
 			cpc rmask, temp
@@ -1007,36 +1011,27 @@ handleADC:
 			rjmp endCheckIfPotFind
 		notWithinAnyBounds:
 			clr temp	    ;clear these values, as the LED values will be placed in them 
-			clr temp2			;but they will remain blank in for within the set bounds
+			clr temp2		;but they will remain blank for within the set bounds
 			cpi col, 1
 			brne endCheckIfPotFind
 			ldii screenStage, stage_pot_reset
 		endCheckIfPotFind:
-			out PORTC, temp2
+			out PORTC, temp2	;put LED lights on display
 			out PORTG, temp
-			rjmp endHandleADC	
 	endHandleADC:
 	pop col
 	pop temp2
 	pop cmask
 	pop rmask
 	pop temp
-	reti
+reti
 
-asciiconv:				;no need for ascii convert as digits show up as '*' (we need this for count down)
-	;push r17
+asciiconv:	;converts numbers to ascii using the decimal subtraction method		
 	push r18
 	push r19
 	push temp
 	clr r18
 	clr r19
-	;clr r17
-  	;numhundreds:
- 	;cpi temp, 100
- 	;brlo numtens ;branch if lower due to unsigned
- 	;inc r17
- 	;subi temp, 100 
- 	;rjmp numhundreds
 	numtens:
 	cpi temp, 10
 	brlo numones ;branch if lower due to unsigned
@@ -1046,18 +1041,13 @@ asciiconv:				;no need for ascii convert as digits show up as '*' (we need this 
 	numones:
 	mov r18, temp
 	ldi temp, '0'
-	;addi r17, '0'
- 	;cpse r17, temp
- 	;do_lcd_data r17
 	addi r19, '0'
-	;cpse r19, temp
-	do_lcd_data r19
+	do_lcd_data r19	;display tens
 	addi r18, '0'
-	do_lcd_data r18
+	do_lcd_data r18	;display ones
 	pop temp
 	pop r19
 	pop r18
-	;pop r17
 	ret
 
 randomizePotLocation:
@@ -1066,18 +1056,19 @@ randomizePotLocation:
 
 	pickRandPotVal:
 	lds temp2, randomPosition +1
-	lds cmask,  TCNT2	   				; this register used to hold LOW 8 bits of RAND number
-	lds rmask,  randomPosition         ; this register used to hold HIGH bits of RAND number
+	lds cmask,  TCNT2	   			; this register used to hold LOW 8 bits of RAND number
+	lds rmask,  randomPosition       ; this register used to hold HIGH bits of RAND number
 	eor cmask, temp2
-	com temp2
+	com temp2				;mixing it up a bit
 	eor rmask, temp2
 	andi rmask, 0b11
 	
+	;if outside bounds of POT, reset the value
 	ldi temp, high(pot_pos_max)
 	cpi cmask, low(pot_pos_max)
 	cpc rmask, temp
 	brsh pickRandPotVal
-
+	;if outside bounds of POT, reset the value
 	ldi temp, high(pot_pos_min)
 	cpi cmask, low(pot_pos_min)
 	cpc rmask, temp
@@ -1085,7 +1076,6 @@ randomizePotLocation:
 
 	pop temp2
 	pop temp
-
 ret
 
 ;;;;;;;LEAVE THIS HERE - NEEDS TO BE INCLUDED LAST!!!;;;;;;;

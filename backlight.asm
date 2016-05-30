@@ -25,7 +25,7 @@ initialiseBacklightTimer:
 	sts OCR3BH, temp
 
 	pop temp
-	ret
+ret
 
 backlightFadeIn:
 	push temp
@@ -39,7 +39,7 @@ backlightFadeIn:
 	sts BacklightCounter+1, temp
 
 	pop temp
-	ret
+ret
 
 backlightFadeOut:
 	push temp
@@ -47,12 +47,5 @@ backlightFadeOut:
 	ldi temp, LCD_BACKLIGHT_FADEOUT			; set backlight fade state to fade out
 	sts BacklightFade, temp
 
-	;sts BacklightPWM, temp2
-	
-	;clr temp
-	;sts BacklightSeconds, temp
-	;sts BacklightCounter, temp
-	;sts BacklightCounter+1, temp
-
 	pop temp
-	ret
+ret

@@ -32,6 +32,7 @@
 	do_lcd_data r16
 .endmacro
 
+;Disables the ADC
 .macro disable_ADC
 	push temp
 	push temp2
@@ -44,6 +45,7 @@
 	pop temp
 .endmacro
 
+;Enables the ADC
 .macro enable_ADC
 	push temp
 	lds temp, ADCSRA 
@@ -52,6 +54,9 @@
 	pop temp
 .endmacro
 
+;Store custom character
+;Pass in character number,
+;and addess to character in cseg
 .macro do_lcd_store_custom
 	push zl
 	push zh
@@ -65,6 +70,7 @@
 	pop zl
 .endmacro
 
+;Show custom characters on screen
 .macro do_lcd_show_custom
 	do_lcd_command 0b10001110
 	do_lcd_data_i @0
@@ -72,12 +78,6 @@
 	do_lcd_data_i @1
 .endmacro
 
-.macro reset_Stack
-	ldi temp, low(RAMEND) ; initialize the stack
-	out SPL, temp
-	ldi temp, high(RAMEND)
-	out SPH, temp
-.endmacro
 
 ; Pass this macro a register, and it will put
 ;the value within the register on screen
@@ -156,22 +156,23 @@
 	pop r16
 .endmacro
 
+;Clears all registers
 .macro cleanAllReg
-	clr screenStage		
-	clr screenStageFol 	
+	clr debounce
+	clr screenStage	
+	clr screenStageFol
 	clr counter		
-	clr running			
+	clr running		
 	clr keyButtonPressed	
-	clr row				
-	clr col				
-	clr rmask				
-	clr cmask				
-	clr temp				
-	clr temp2				
+	clr row			
+	clr col			
+	clr rmask			
+	clr cmask			
+	clr temp			
+	clr temp2			
 	clr keypadCode		
 	clr curRound		
 	clr difficultyCount
-	clr debounce
 .endmacro
 
 ;Toggles the strobe light when called
@@ -186,8 +187,9 @@
 	pop temp
 .endmacro
 
-
-
+;Uses psuedo random LCG to keep
+;track of number of timer
+;interrupts since start
 .macro performRandomLCG
 	push temp
 	push temp2
@@ -207,7 +209,9 @@
 	pop temp
 .endmacro
 
-
+;Macro to beep the speaker
+;for a desired period of time
+;using fixed overflow counts
 .macro speakerBeepFor
 	push temp
 		ldi temp, @0
