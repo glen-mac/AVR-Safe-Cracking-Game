@@ -41,6 +41,7 @@
 .def keypadCode			= r22	; the 'random' code being searched for on the keypad
 .def curRound			= r23	; a counter representing the current round (used for addressing memory)
 .def difficultyCount	= r24	; a register holding the countdown value for the current difficulty
+.def gameShouldReset	= r25
 ;;;;;;;;;;;;DESEG VARIABLES;;;;;;;;;;;;
 .dseg
 gameloopTimer:			.byte 2	; counts number of timer overflows for gameloop
@@ -173,12 +174,6 @@ RESET:
 		;disable some timers for the start stage
 		toggle TIMSK1, 0
 		toggle TIMSK4, 0
-
-		;reset the stack pointer
-		ldi temp, low(RAMEND) 
-		out SPL, temp
-		ldi temp, high(RAMEND)
-		out SPH, temp
 		
 		;clear things we NEED cleared
 		clr screenStage
@@ -186,6 +181,7 @@ RESET:
 		clr counter
 		clr running
 		clr curRound
+		clr gameShouldReset
 		sts speakerCounter, counter
 		out PORTC, counter
 		out PORTG, counter
@@ -197,6 +193,8 @@ RESET:
 
 		;to prevent another game starting after win or lose, 
 		;automatically starting another game when clicking PB1 (bad)
+		;The counters are cleared below, so it will be 100ms until
+		;debounce is cleared again, making the debounce work!
 		ldii debounce, 1 
 
 		;clear data memory
@@ -232,19 +230,20 @@ RESET:
  			do_lcd_show_custom 2, 0
 			endRestoreDifficulty:
 	sei
+
 	
 halt:
-	rjmp halt
-
-
+	cpi gameShouldReset, 1
+	brne halt 
+	cli	;don't disturb me while I reset
+	rjmp gameRestart
 
 Timer0OVF: ;This is an 8-bit timer - Game loop.
-
-	performRandomLCG
-
 	;timer prologue
 	push yl
 	push yh
+	push temp
+	in temp, SREG
 	push temp
 	lds yl, gameloopTimer
 	lds yh, gameloopTimer+1
@@ -310,6 +309,8 @@ Timer0OVF: ;This is an 8-bit timer - Game loop.
 
 	endTimer0:
 	pop temp
+	out SREG, temp
+	pop temp
 	pop yh
 	pop yl
 reti
@@ -369,7 +370,6 @@ ret
 potFindFunc:
 	cpii screenStageFol, stage_pot_find
 	breq endPotFindFunc
-	;ldii running, 1  					;backlight should be on
 	ldii screenStageFol, stage_pot_find	
 	do_lcd_write_str str_findposition_msg ;this is the reset pot message?
 	do_lcd_command 0b11001011	; move cursor so countdown can be written
@@ -402,7 +402,6 @@ codeFindFunc:
 
 	continueCodeFindFunc:
 
-	;ldii running, 1 ;backlight should be on
 	ldii screenStageFol, stage_code_find
 
 	disable_ADC
@@ -424,7 +423,6 @@ ret
 codeEnterFunc:
 	cpii screenStageFol, stage_code_enter
 	breq endCodeEnterFunc
-	;ldii running, 1 ;backlight sh
 	ldii screenStageFol, stage_code_enter
 	do_lcd_write_str str_entercode_msg
 
@@ -468,9 +466,10 @@ loseFunc:
 ret
 
 Timer1OVF: ;This is a countdown timer (16-bit)
-	performRandomLCG
 	push yl
 	push yh
+	push temp
+	in temp, SREG
 	push temp
 	lds yl, counterTimer
 	lds yh, counterTimer+1
@@ -539,14 +538,15 @@ Timer1OVF: ;This is a countdown timer (16-bit)
 		rjmp endTimer1
 	endTimer1:
 		pop temp
+		out SREG, temp
+		pop temp
 		pop yh
 		pop yl
 reti
 
-Timer3OVF:	
-	performRandomLCG							
-	push temp
+Timer3OVF:								
 	push temp2
+	push temp
 	in temp, SREG
 	push temp
 	push r24
@@ -634,13 +634,14 @@ Timer3OVF:
 		pop r24
 		pop temp
 		out SREG, temp
-		pop temp2
 		pop temp
+		pop temp2
 reti
 
 
 Timer4OVF:	;used for the speaker sounds
-	performRandomLCG
+	push temp
+	in temp, SREG
 	push temp
 	push temp2
 
@@ -664,15 +665,18 @@ Timer4OVF:	;used for the speaker sounds
 	timer4Epilogue:
 	pop temp2
 	pop temp
+	out SREG, temp
+	pop temp
 reti
 
 Timer2OVF: ;keypad loop
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;KEYPAD LOGIC;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	performRandomLCG
 	push yl
 	push yh
+	push temp
+	in temp, SREG
 	push temp
 
 	lds yl, keypadTimer
@@ -760,7 +764,8 @@ convert:
 	winLoseReset:
 		cpii keyButtonPressed, 1
 		breq endConvert
-		rjmp gameRestart
+		ldi gameShouldReset, 1
+		rjmp epilogueTimer2
 
 	checkRemaindingStages:
 	
@@ -908,19 +913,36 @@ epilogueTimer2:
 	pop col
 endTimer2:
 	pop temp
+	out SREG, temp
+	pop temp
 	pop yh
 	pop yl
 reti
 	
 EXT_INT_R:	;right push button
+	push temp
+	in temp, SREG
+	push temp
+
+	cpii debounce, 0
+	brne preEndRestartButton
+
 	rcall backlightFadeIn
 	cpii screenStage, stage_start ;check if on start screen
 		breq preEndRestartButton
-		rjmp gameRestart
+		ldi gameShouldReset, 1
+
 	preEndRestartButton:
+	pop temp
+	out SREG, temp
+	pop temp
 reti
 
 EXT_INT_L:	;left push button
+	push temp
+	in temp, SREG
+	push temp
+
 	cpii debounce, 0 ;debouncing so game doesn't start itself
 		brne endExtIntL
 		rcall backlightFadeIn
@@ -932,17 +954,23 @@ EXT_INT_L:	;left push button
 	checkStageWin:
 		cpii screenStage, stage_win  ;check if on win screen
 			brne checkStageLose
-			rjmp gameRestart
+			ldi gameShouldReset, 1
+			rjmp endExtIntL
 
 	checkStageLose:
 		cpii screenStage, stage_lose	;check if on lose screen
 			brne endExtIntL
-			rjmp gameRestart
+			ldi gameShouldReset, 1
 
 	endExtIntL:
+	pop temp
+	out SREG, temp
+	pop temp
 reti
 
 handleADC:
+	push temp
+	in temp, SREG
 	push temp
 	push rmask
 	push cmask
@@ -1030,12 +1058,15 @@ handleADC:
 	pop cmask
 	pop rmask
 	pop temp
+	out SREG, temp
+	pop temp
 reti
 
 asciiconv:	;converts numbers to ascii using the decimal subtraction method		
 	push r18
 	push r19
 	push temp
+
 	clr r18
 	clr r19
 	numtens:
@@ -1051,6 +1082,7 @@ asciiconv:	;converts numbers to ascii using the decimal subtraction method
 	do_lcd_data r19	;display tens
 	addi r18, '0'
 	do_lcd_data r18	;display ones
+
 	pop temp
 	pop r19
 	pop r18
@@ -1061,12 +1093,8 @@ randomizePotLocation:
 	push temp2
 
 	pickRandPotVal:
-	lds temp2, randomPosition +1
-	lds cmask,  TCNT2	   			; this register used to hold LOW 8 bits of RAND number
-	lds rmask,  randomPosition       ; this register used to hold HIGH bits of RAND number
-	eor cmask, temp2
-	com temp2				;mixing it up a bit
-	eor rmask, temp2
+	lds cmask,  TCNT3L	   	; this register used to hold LOW 8 bits of RAND number
+	mov rmask,  cmask       ; this register used to hold HIGH bits of RAND number
 	andi rmask, 0b11
 	
 	;if outside bounds of POT, reset the value

@@ -187,28 +187,6 @@
 	pop temp
 .endmacro
 
-;Uses psuedo random LCG to keep
-;track of number of timer
-;interrupts since start
-.macro performRandomLCG
-	push temp
-	push temp2
-	push col
-
-	ldi col, 1
-	lds temp, randomPosition
-	lds temp2, randomPosition + 1
-	add temp, col
-	ldi col, 0
-	adc temp2, col
-	sts randomPosition, temp
-	sts randomPosition + 1, temp2
-
-	pop col
-	pop temp2
-	pop temp
-.endmacro
-
 ;Macro to beep the speaker
 ;for a desired period of time
 ;using fixed overflow counts
