@@ -117,7 +117,7 @@ RESET:
 	do_lcd_command 0b00001000 ; display off
 	do_lcd_command 0b00000001 ; clear display
 	do_lcd_command 0b00000110 ; increment, no display shift
-	do_lcd_command 0b00001110 ; Cursor on, bar, no blink
+	;do_lcd_command 0b00001100 ; Cursor on, bar, no blink
 	;;;;;;;;prepare EXTERNAL INTERRUPTS;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	ldi temp, (2 << ISC00)	;set INT0 
 	ldi temp, (2 << ISC10)	;and INT1
@@ -191,6 +191,9 @@ RESET:
 
 	;;;;;;;;GAME RESTART SEGMENT;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	gameRestart:
+
+		do_lcd_command 0b00001100 ; Display on, no cursor, no blink
+
 		;disable some timers for the start stage
 		toggle TIMSK1, 0
 		toggle TIMSK4, 0
@@ -445,6 +448,7 @@ codeEnterFunc:
 	cpii screenStageFol, stage_code_enter
 	breq endCodeEnterFunc
 	ldii screenStageFol, stage_code_enter
+	do_lcd_command 0b00001110 ;cursor on
 	do_lcd_write_str str_entercode_msg
 
 	clr counter	;clear counter to count number of button presses to index memory in data seg
@@ -455,6 +459,7 @@ ret
 winFunc:
 	cpii screenStageFol, stage_win
 	breq epilogueWinFunc
+	do_lcd_command 0b00001100 ;cursor off
 	clr running					;backlight should begin to fade out
 	ldii screenStageFol, stage_win
 	toggle TIMSK1, 0			;turn off countdown timer
