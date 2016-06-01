@@ -8,7 +8,7 @@ initialiseBacklightTimer:
 	push temp
 	
 	clr temp					; clear variables
-	sts BacklightSeconds, temp
+	sts BacklightTime, temp
 	sts BacklightCounter, temp
 	sts BacklightCounter+1, temp
 	sts BacklightFadeCounter, temp
@@ -35,7 +35,7 @@ backlightFadeIn:
 	sts BacklightFade, temp	
 	
 	clr temp									; reset the backlight counter
-	sts BacklightSeconds, temp
+	sts BacklightTime, temp
 	sts BacklightCounter, temp
 	sts BacklightCounter+1, temp
 
