@@ -3,6 +3,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;; LCD CODE ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;This file is for storing the MAIN code used to write to the LCD, including
+;neccessary timing functions. It has been based around code segments shown
+;in the lectures, with huge modifications to expand the feature set of
+;what the initial LCD was intended for.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;constants
 .equ LCD_RS = 7

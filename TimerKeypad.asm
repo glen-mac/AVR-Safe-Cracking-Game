@@ -1,7 +1,16 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;; KEYPAD ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;This file is for storing the MAIN code used to control and read from the
+;keypad. This file contains a large segment of code, due to the keypad
+;being such an integral part of the whole system. It is split into sub sections
+;where appropriate to make the flow of the timer more easily seen.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Timer2OVF: ;keypad loop
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;KEYPAD LOGIC;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 	push yl
 	push yh
 	push temp
@@ -99,7 +108,7 @@ convert:
 	checkRemaindingStages:
 	
 	cpii screenStage, stage_start
-	breq setDifficulty
+	breq startScreenKeypad
 
 	cpii screenStageFol, stage_code_find
 	brne checkIfCodeEnter 
@@ -113,87 +122,10 @@ convert:
 	endConvert:
 	rjmp epilogueTimer2
 
-setDifficulty:	
-	Akey:
-		cpi temp, 3 ;A
-		brne Bkey
-		ldi difficultyCount, 20
-		do_lcd_show_custom 2, 0
-		rjmp storeDiff
-	Bkey:
-		cpi temp, 7 ;B
-		brne Ckey
-		ldi difficultyCount, 15
-		do_lcd_show_custom 1, 5
-		rjmp storeDiff
-	Ckey:
-		cpi temp, 11 ;C
-		brne Dkey
-		ldi difficultyCount, 10
-		do_lcd_show_custom 1, 0
-		rjmp storeDiff
-	Dkey:	
-		cpi temp, 15 ;D	
-		brne StarKey				
-		ldi difficultyCount, 6
-		do_lcd_show_custom  0, 6
-		rjmp storeDiff
-	StarKey:
-		cpi temp, 12 ;*
-		breq showScore20
-		rjmp HashKey
-		showScore20:	
-		cpi difficultyCount, 20
-		brne showScore15
-			do_lcd_command 0b10001110
-			lds temp, highScores
-			rcall asciiconv
-			rjmp performJMPtimer2End
-		showScore15:
-		cpi difficultyCount, 15
-		brne showScore10
-			do_lcd_command 0b10001110
-			lds temp, highScores + 1
-			rcall asciiconv
-			rjmp performJMPtimer2End
-		showScore10:
-		cpi difficultyCount, 10
-		brne showScore6
-			do_lcd_command 0b10001110
-			lds temp, highScores + 2
-			rcall asciiconv
-			rjmp performJMPtimer2End
-		showScore6:
-		cpi difficultyCount, 6
-		breq doShowScore6
-			rjmp performJMPtimer2End			
-			doShowScore6:
-			do_lcd_command 0b10001110
-			lds temp, highScores + 3
-			rcall asciiconv
-			rjmp performJMPtimer2End
-	HashKey:
-		cpi temp, 14 ;hash key (reset highscores)
-		breq doScoreClear
-		rjmp performJMPtimer2End
-			doScoreClear:
-			ldi temp, 0
-			writeToEEPROM 2, temp
-			writeToEEPROM 3, temp
-			writeToEEPROM 4, temp
-			writeToEEPROM 5, temp
-			sts highScores, temp
-			sts highScores + 1, temp
-			sts highScores + 2, temp
-			sts highScores + 3, temp
-			rjmp showScore20
+startScreenKeypad:	
 
-	storeDiff:
-
-		writeToEEPROM 0, difficultyCount
-
-	performJMPtimer2End:
-		rjmp epilogueTimer2	
+	rcall StartScreenButtonClick
+	rjmp epilogueTimer2	
 
 keypadCodeEnter:
 	cpii keyButtonPressed, 1
@@ -301,3 +233,88 @@ endTimer2:
 	pop yh
 	pop yl
 reti
+
+;handles the keypresses on the start screen
+;from setting difficulty to reseting and viewing
+;highscores
+StartScreenButtonClick:
+	Akey:
+		cpi temp, 3 ;A
+		brne Bkey
+		ldi difficultyCount, 20
+		do_lcd_show_custom 2, 0
+		rjmp storeDiff
+	Bkey:
+		cpi temp, 7 ;B
+		brne Ckey
+		ldi difficultyCount, 15
+		do_lcd_show_custom 1, 5
+		rjmp storeDiff
+	Ckey:
+		cpi temp, 11 ;C
+		brne Dkey
+		ldi difficultyCount, 10
+		do_lcd_show_custom 1, 0
+		rjmp storeDiff
+	Dkey:	
+		cpi temp, 15 ;D	
+		brne StarKey				
+		ldi difficultyCount, 6
+		do_lcd_show_custom  0, 6
+		rjmp storeDiff
+	StarKey:
+		cpi temp, 12 ;*
+		breq showScore20
+		rjmp HashKey
+		showScore20:	
+		cpi difficultyCount, 20
+		brne showScore15
+			do_lcd_command 0b10001110
+			lds temp, highScores
+			rcall asciiconv
+			rjmp performJMPtimer2End
+		showScore15:
+		cpi difficultyCount, 15
+		brne showScore10
+			do_lcd_command 0b10001110
+			lds temp, highScores + 1
+			rcall asciiconv
+			rjmp performJMPtimer2End
+		showScore10:
+		cpi difficultyCount, 10
+		brne showScore6
+			do_lcd_command 0b10001110
+			lds temp, highScores + 2
+			rcall asciiconv
+			rjmp performJMPtimer2End
+		showScore6:
+		cpi difficultyCount, 6
+		breq doShowScore6
+			rjmp performJMPtimer2End			
+			doShowScore6:
+			do_lcd_command 0b10001110
+			lds temp, highScores + 3
+			rcall asciiconv
+			rjmp performJMPtimer2End
+	HashKey:
+		cpi temp, 14 ;hash key (reset highscores)
+		breq doScoreClear
+		rjmp performJMPtimer2End
+			doScoreClear:
+			ldi temp, 0
+			writeToEEPROM 2, temp
+			writeToEEPROM 3, temp
+			writeToEEPROM 4, temp
+			writeToEEPROM 5, temp
+			sts highScores, temp
+			sts highScores + 1, temp
+			sts highScores + 2, temp
+			sts highScores + 3, temp
+			rjmp showScore20
+
+	storeDiff:
+
+		writeToEEPROM 0, difficultyCount
+
+	performJMPtimer2End:
+ret

@@ -1,6 +1,12 @@
-;;;;;;;;;;;;; TO DO ;;;;;;;;
-; Get HDs
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;; SAFE CRACKER ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; GAME ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;This file is for storing the MAIN code of the Game!;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;By Glenn & Jerry ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 .include "m2560def.inc"
 .include "macros.asm"
@@ -41,8 +47,8 @@
 .def keypadCode			= r22	; the 'random' code being searched for on the keypad
 .def curRound			= r23	; a counter representing the current round (used for addressing memory)
 .def difficultyCount	= r24	; a register holding the countdown value for the current difficulty
-.def gameShouldReset	= r25  ;a boolean flag indicating the game is going to reset
-;;;;;;;;;;;;DESEG VARIABLES;;;;;;;;;;;;
+.def gameShouldReset	= r25   ;a boolean flag indicating the game is going to reset
+;;;;;;;;;;;;;DSEG VARIABLES;;;;;;;;;;;;
 .dseg
 gameloopTimer:			.byte 2	; counts number of timer overflows for gameloop
 counterTimer: 			.byte 2	; counts number of timer overflows for counter
@@ -74,7 +80,7 @@ highScores:				.byte 4 ; a byte array to store current highscores
 	jmp Timer4OVF	; speaker timer
 .org 0x3A
 	jmp handleADC	; ADC complete reading
-;;;;;;;;;;;;STRING LIST;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;STRING LIST;;;;;;;;;;;;;;;;;;;
 .org 0x70 ;(1 denotes a new line, 0 denotes end of second line)
 str_home_msg: 			.db 	"2121 16s1", 		1, 		"Safe Cracker",0, 	0
 str_keypadscan_msg: 	.db 	"Position found!",	1, 		"Scan for number", 	0
@@ -84,6 +90,7 @@ str_win_msg: 			.db 	"Game complete", 	1, 		"You Win!",0, 		0
 str_reset_msg:			.db 	"Reset POT to 0", 	1, 		"Remaining:      ", 0
 str_countdown_msg: 		.db 	"2121 16s1", 		1, 		"Starting in ",0, 	0
 str_entercode_msg: 		.db 	"Enter Code", 		1, 							0
+;;;;;;;;;;;;CUSTOM CHARACTER LIST;;;;;;;;;;;;;;
 lcd_char_smiley: 		.db		0x00, 0x00, 0x0A, 0x00, 0x11, 0x0E, 0x00, 0x00
 lcd_char_two: 			.db		0x0E, 0x02, 0x04, 0x0F, 0x00, 0x00, 0x00, 0x00
 lcd_char_one: 			.db		0x0C, 0x04, 0x04, 0x0E, 0x00, 0x00, 0x00, 0x00
@@ -254,7 +261,7 @@ RESET:
 			endRestoreDifficulty:
 	sei
 
-	
+;this is where the game sits between interrupts, checking if it should reset
 halt:
 	cpi gameShouldReset, 1 ;should game reset?
 	brne halt 
@@ -262,7 +269,7 @@ halt:
 	rjmp gameRestart ;yes we should reset (set by RESET button, and buttons when at win/lose)
 
 	
-EXT_INT_R:	;right push button
+EXT_INT_R:	;right push button (RESET game!!)
 	push temp
 	in temp, SREG
 	push temp
@@ -281,14 +288,14 @@ EXT_INT_R:	;right push button
 	pop temp
 reti
 
-EXT_INT_L:	;left push button
+EXT_INT_L:	;left push button (start game, return home)
 	push temp
 	in temp, SREG
 	push temp
 
 	cpii debounce, 0 ;debouncing so game doesn't start itself
 		brne endExtIntL
-		rcall backlightFadeIn
+		rcall backlightFadeIn ;begin to fade in LCD
 	cpii screenStage, stage_start ;check if on start screen
 		brne checkStageWin
 		ldii screenStage, stage_countdown ;if we are, start countdown
