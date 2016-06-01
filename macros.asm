@@ -197,3 +197,45 @@
 		toggle TIMSK4, 1<<TOIE4
 	pop temp
 .endmacro
+
+
+.macro writeToEEPROM
+push temp
+push temp2
+		ldi temp, 0
+		ldi temp2, @0
+		EEPROM_write:
+		; Wait for completion of previous write
+		sbic EECR,EEPE
+		rjmp EEPROM_write
+		; Set up address (r18:r17) in address register
+		out EEARH, temp
+		out EEARL, temp2
+		; Write data to Data Register
+		out EEDR, @1
+		; Write logical one to EEMPE
+		sbi EECR,EEMPE
+		; Start eeprom write by setting EEPE
+		sbi EECR,EEPE
+pop temp2
+pop temp
+.endmacro
+
+.macro readFromEEPROM
+push temp2
+	ldi temp, 0
+	ldi temp2, @0
+	;restore last difficulty from eeprom
+	EEPROM_read:
+	; Wait for completion of previous write
+	sbic EECR,EEPE
+	rjmp EEPROM_read
+	; Set up address (0x0000) in address register
+	out EEARH, temp
+	out EEARL, temp2
+	; Start eeprom read by writing EERE
+	sbi EECR,EERE
+	; Read data from Data Register
+	in temp, EEDR
+pop temp2
+.endmacro

@@ -56,6 +56,7 @@ BacklightPWM: 			.byte 1 ; current backlight brightness
 speakerCounter: 		.byte 1 ; number of loops so far for the speaker timer
 speakerCounterGoal:		.byte 1 ; number of loops to do for the duration
 randomPosition:			.byte 2	; used for random number (LCG method - interrupts)
+highScores:				.byte 4 ; a byte array to store current highscores
 ;;;;;;;;;;;;VECTOR TABLE;;;;;;;;;;;;;;
 .cseg
 	jmp RESET
@@ -131,18 +132,18 @@ RESET:
 	sts TCCR4A, temp
 	ldi temp, (1<<CS01)
 	out TCCR0B, temp
-	ldi temp, (1<<CS11)
+	;ldi temp, (1<<CS11)  	;not required, but included for completeness
 	sts TCCR1B, temp
-	ldi temp, (1<<CS21)
+	;ldi temp, (1<<CS21)	;not required, but included for completeness
 	sts TCCR2B, temp
-	ldi temp, (1<<CS31)
+	;ldi temp, (1<<CS31) 	;not required, but included for completeness
 	sts TCCR3B, temp
 	ldi temp, (1<<CS40)
 	sts TCCR4B, temp
-	toggle TIMSK0, 1<<TOIE0
-	toggle TIMSK2, 1<<TOIE2  ;timer for difficulty
-	toggle TIMSK3, 1<<TOIE3
-	;;;;;;;;prepare MISC;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	toggle TIMSK0, 1<<TOIE0	 ;timer for game loop
+	toggle TIMSK2, 1<<TOIE2  ;timer for keypad
+	toggle TIMSK3, 1<<TOIE3	 ;timer for backlight
+	;;;;;;;;prepare PORTS;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   	ldi temp, PORTLDIR 		;KEYPAD
 	sts DDRL, temp
 	ldi temp, 0b00011000  	;set PORTE (pins 3&4) to output (Backlight = 4, Motor = 3)
@@ -158,18 +159,37 @@ RESET:
 	out PORTC, temp  		;BLANK the LED bar
 	out PORTG, temp 		;BLANK the top LEDs on LED bar
 	out PORTB, temp
-		
-	ldi temp, (1 << REFS0) | (0 << ADLAR) | (0 << MUX0);     Set ADC reference to AVCC
+	;;;;;;;;prepare ADC;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	ldi temp, (1 << REFS0) | (0 << ADLAR) | (0 << MUX0);Set ADC reference
 	sts ADMUX, temp
 	ldi temp, (1 << MUX5); 
 	sts ADCSRB, temp
-	ldi temp,  (1 << ADATE) | (1 << ADIE) | (5 << ADPS0);ADC ENABLED, FREE RUNNING, INTERRUPT ENABLED, PRESCALER
+	ldi temp,  (1 << ADATE) | (1 << ADIE) | (5 << ADPS0); FREE RUNNING, INTERRUPT ENABLED, PRESCALER
 	sts ADCSRA, temp
-
+	;;;;;;;;prepare MISC;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	rcall initialiseBacklightTimer  ;;code for the backlight timer
-	
 	cleanAllReg	;clean the registers (clean slate)
 
+	;check if my secret code is stored position 1
+	;in EEPROM. If it is, data fields have been initialized
+	;at some point. Otherwise we need to prepare them...
+	rcall checkIfDataExists	
+
+	;read all data, from highscores to difficulty
+	;into locations where appropriate
+	ReadSavedData:
+	readFromEEPROM 0
+	mov difficultyCount, temp
+	readFromEEPROM 2
+	sts highScores, temp
+	readFromEEPROM 3
+	sts highScores + 1, temp
+	readFromEEPROM 4
+	sts highScores + 2, temp
+	readFromEEPROM 5
+	sts highScores + 3, temp
+
+	;;;;;;;;GAME RESTART SEGMENT;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	gameRestart:
 		;disable some timers for the start stage
 		toggle TIMSK1, 0
@@ -192,9 +212,9 @@ RESET:
 		out PORTA, temp	
 
 		;to prevent another game starting after win or lose, 
-		;automatically starting another game when clicking PB1 (bad)
+		;when clicking PB1 (bad)
 		;The counters are cleared below, so it will be 100ms until
-		;debounce is cleared again, making the debounce work!
+		;debounce is cleared again, making the debounce perfect!
 		ldii debounce, 1 
 
 		;clear data memory
@@ -401,6 +421,8 @@ codeFindFunc:
 	rjmp endCodeFindFunc
 
 	continueCodeFindFunc:
+
+	rcall updateHighscores ;did we beat a highscore?!?!
 
 	ldii screenStageFol, stage_code_find
 
@@ -790,24 +812,78 @@ setDifficulty:
 		brne Bkey
 		ldi difficultyCount, 20
 		do_lcd_show_custom 2, 0
-		rjmp epilogueTimer2
+		rjmp storeDiff
 	Bkey:
 		cpi temp, 7 ;B
 		brne Ckey
 		ldi difficultyCount, 15
 		do_lcd_show_custom 1, 5
-		rjmp epilogueTimer2
+		rjmp storeDiff
 	Ckey:
 		cpi temp, 11 ;C
 		brne Dkey
 		ldi difficultyCount, 10
 		do_lcd_show_custom 1, 0
-		rjmp epilogueTimer2
+		rjmp storeDiff
 	Dkey:	
 		cpi temp, 15 ;D	
-		brne performJMPtimer2End				
+		brne StarKey				
 		ldi difficultyCount, 6
 		do_lcd_show_custom  0, 6
+		rjmp storeDiff
+	StarKey:
+		cpi temp, 12 ;*
+		breq showScore20
+		rjmp HashKey
+		showScore20:	
+		cpi difficultyCount, 20
+		brne showScore15
+			do_lcd_command 0b10001110
+			lds temp, highScores
+			rcall asciiconv
+			rjmp performJMPtimer2End
+		showScore15:
+		cpi difficultyCount, 15
+		brne showScore10
+			do_lcd_command 0b10001110
+			lds temp, highScores + 1
+			rcall asciiconv
+			rjmp performJMPtimer2End
+		showScore10:
+		cpi difficultyCount, 10
+		brne showScore6
+			do_lcd_command 0b10001110
+			lds temp, highScores + 2
+			rcall asciiconv
+			rjmp performJMPtimer2End
+		showScore6:
+		cpi difficultyCount, 6
+		breq doShowScore6
+			rjmp performJMPtimer2End			
+			doShowScore6:
+			do_lcd_command 0b10001110
+			lds temp, highScores + 3
+			rcall asciiconv
+			rjmp performJMPtimer2End
+	HashKey:
+		cpi temp, 14 ;hash key (reset highscores)
+		breq doScoreClear
+		rjmp performJMPtimer2End
+			doScoreClear:
+			ldi temp, 0
+			writeToEEPROM 2, temp
+			writeToEEPROM 3, temp
+			writeToEEPROM 4, temp
+			writeToEEPROM 5, temp
+			sts highScores, temp
+			sts highScores + 1, temp
+			sts highScores + 2, temp
+			sts highScores + 3, temp
+			rjmp showScore20
+
+	storeDiff:
+
+		writeToEEPROM 0, difficultyCount
 
 	performJMPtimer2End:
 		rjmp epilogueTimer2	
@@ -1112,6 +1188,80 @@ randomizePotLocation:
 	pop temp
 ret
 
-;;;;;;;LEAVE THIS HERE - NEEDS TO BE INCLUDED LAST!!!;;;;;;;
+
+
+;a macro for the function below to prevent
+;code from being repeated, and to clean it up a bit
+.macro scoreCheckMacro
+	lds temp2, highScores + @0 
+	cp temp2, col
+	brsh @1 	;if current score is the same or worse then leave
+	writeToEEPROM @2, col ;store score in EEPROM
+	sts highScores + @0, col  ;store score in local data memory
+	rjmp endUpdateHighscores
+.endmacro
+
+;a function to check if the current remaining time
+;on the clock, is greater than the highscore for the
+;respective current difficulty. If it is, stores to
+;EEPROM and updates current data memory for display
+;purposes
+updateHighscores:
+	push col
+	push temp2
+
+	mov col, difficultyCount ;find remaining time left
+	sub col, counter		 ;find remaining time left
+	;switch case for current difficulty
+	cpi difficultyCount, 20
+	breq Score20
+	cpi difficultyCount, 15
+	breq Score15
+	cpi difficultyCount, 10
+	breq Score10
+	cpi difficultyCount, 6
+	breq Score6
+
+	goToEndOfHScores:
+	rjmp endUpdateHighscores
+
+	Score20: ;if current difficulty is 20
+		scoreCheckMacro 0, goToEndOfHScores, 2
+	Score15: ;if current difficulty is 15
+		scoreCheckMacro 1, endUpdateHighscores, 3
+	Score10: ;if current difficulty is 10
+		scoreCheckMacro 2, endUpdateHighscores, 4
+	Score6: ;if current difficulty is 6
+		scoreCheckMacro 3, endUpdateHighscores, 5
+
+	endUpdateHighscores:
+	pop temp2
+	pop col
+ret
+
+;;;;;;;LEAVE THIS HERE;;;;;;;;
 .include "backlight.asm"
 .include "LCD.asm"
+
+;checks if EEPROM has been initilized at some point
+;if not, does so in preparation for gameplay
+checkIfDataExists:
+	push col
+	readFromEEPROM 1
+	cpi temp, 0xAA
+	brne performDataInit
+	rjmp endOfSaveChecking
+		performDataInit:
+		ldi col, 20
+		writeToEEPROM 0, col ;difficulty
+		ldi col, 0
+		writeToEEPROM 5, col ;save score for 6s
+		writeToEEPROM 4, col ;save score for 10s
+		writeToEEPROM 3, col ;save score for 15s
+		writeToEEPROM 2, col ;save score for 20s
+		ldi col, 0xAA
+		writeToEEPROM 1, col ;unique initialized flag
+	endOfSaveChecking:
+		pop col
+ret
+
