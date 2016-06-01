@@ -55,7 +55,7 @@ counterTimer: 			.byte 2	; counts number of timer overflows for counter
 keypadTimer: 			.byte 2	; counts number of timer overflows for keypad
 randomcode: 			.byte max_num_rounds; stores the 'random' keypad items
 BacklightCounter: 		.byte 2 ; counts timer overflows
-BacklightTime	: 		.byte 1	; counts number of seconds to trigger backlight fade out
+;BacklightTime	: 		.byte 1	; counts number of seconds to trigger backlight fade out
 BacklightFadeCounter: 	.byte 1 ; used to pace the fade in process
 BacklightFade: 			.byte 1 ; flag indicating current backlight process - stable/fade in/fade out
 BacklightPWM: 			.byte 1 ; current backlight brightness
