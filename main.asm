@@ -41,7 +41,7 @@
 .def keypadCode			= r22	; the 'random' code being searched for on the keypad
 .def curRound			= r23	; a counter representing the current round (used for addressing memory)
 .def difficultyCount	= r24	; a register holding the countdown value for the current difficulty
-.def gameShouldReset	= r25
+.def gameShouldReset	= r25  ;a boolean flag indicating the game is going to reset
 ;;;;;;;;;;;;DESEG VARIABLES;;;;;;;;;;;;
 .dseg
 gameloopTimer:			.byte 2	; counts number of timer overflows for gameloop
@@ -592,25 +592,25 @@ Timer3OVF:
 	FadeIn:									; if fading in
 		lds temp2, BacklightPWM
 		cpi temp2, 0xFF						; check if already max brightness
-		breq lcdBacklightReached
+		breq BacklightFin
 		inc temp2							; inc pwm
 		sts BacklightPWM, temp2				; store new pwm
-		rjmp dispLCDBacklight		
+		rjmp dispBacklight		
 
 	FadeOut:
 		lds temp2, BacklightPWM				; if fading out
 		cpi temp2, 0x00						; check if min brightness
-		breq lcdBacklightReached
+		breq BacklightFin
 		dec temp2							; dec pwm
 		sts BacklightPWM, temp2				; store new pwm
-		rjmp dispLCDBacklight
+		rjmp dispBacklight
 
-	lcdBacklightReached:
-		ldi temp, LCD_BACKLIGHT_STABLE
+	BacklightFin:
+		ldi temp, LCD_BACKLIGHT_FULL
 		sts BacklightFade, temp
 		rjmp endFadeCode
 
-	dispLCDBacklight:						; store backlight
+	dispBacklight:						; output backlight
 		lds temp, BacklightPWM
 		sts OCR3BL, temp
 	
@@ -625,10 +625,10 @@ Timer3OVF:
 		cpii running, 1							; check if game is in one of the running stages 
 		breq timer3Epilogue 
 	
-		lds r24, BacklightCounter				; load the backlight counter
+		lds r24, BacklightCounter				; load backlight counter
 		lds r25, BacklightCounter+1
 		adiw r25:r24, 1							; increment the counter
-		sts BacklightCounter, r24				; store new values
+		sts BacklightCounter, r24				; store incremented value
 		sts BacklightCounter+1, r25
 
 		ldi temp, high(3906)
@@ -638,14 +638,14 @@ Timer3OVF:
 
 		clear_datamem BacklightCounter
 
-		lds r24, BacklightSeconds				; load backlight seconds
+		lds r24, BacklightTime				; load backlight seconds
 		inc r24									; increment the backlight seconds
-		sts BacklightSeconds, r24				; store new value
+		sts BacklightTime, r24				; store new value
 
 		cpi r24, 5								; check if it has been 5 seconds
 		brne timer3Epilogue
 		clr temp							
-		sts BacklightSeconds, temp					; reset the seconds
+		sts BacklightTime, temp					; reset the seconds
 
 	fadeOutBacklight:						; start fading out the backlight
 		rcall backlightFadeOut
