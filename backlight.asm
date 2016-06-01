@@ -27,6 +27,7 @@ initialiseBacklightTimer:
 	pop temp
 ret
 
+;set LCD to begin to fade in
 backlightFadeIn:
 	push temp
 
@@ -41,6 +42,7 @@ backlightFadeIn:
 	pop temp
 ret
 
+;set LCD to begin to fade out
 backlightFadeOut:
 	push temp
 

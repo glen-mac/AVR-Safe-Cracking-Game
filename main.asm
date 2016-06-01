@@ -102,12 +102,14 @@ RESET:
 	ser r16
 	out DDRF, r16 
 	out DDRA, r16 
+	;store custom characters into data memory
 	do_lcd_store_custom 	0,	lcd_char_zero
 	do_lcd_store_custom 	1,	lcd_char_one
 	do_lcd_store_custom 	2,	lcd_char_two
 	do_lcd_store_custom 	3,	lcd_char_smiley
 	do_lcd_store_custom 	5,	lcd_char_five
 	do_lcd_store_custom 	6,	lcd_char_six
+	;prepare ports
 	clr r16
 	out PORTF, r16
 	out PORTA, r16
@@ -145,24 +147,22 @@ RESET:
 	toggle TIMSK3, 1<<TOIE3	 ;timer for backlight
 	;;;;;;;;prepare PORTS;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   	ldi temp, PORTLDIR 		;KEYPAD
-	sts DDRL, temp
+	sts DDRL, temp			;KEYPAD
 	ldi temp, 0b00011000  	;set PORTE (pins 3&4) to output (Backlight = 4, Motor = 3)
-	out DDRE, temp		
+	out DDRE, temp			;BACKLIGHT & MOTOR
 	ldi temp, 0xFF
 	out DDRC, temp			;PORTC is for LED bar
 	out DDRG, temp			;PORTG is for LED bar (top 2 LEDs)
-	ldi temp, 1
+	ldi temp, 0b00000001	;set PORTB pin 1 to output for speaker
 	out DDRB, temp			;PORTB is for the speaker
 	ldi temp, 0b00010000	;pin position 3 is motor, 4 is LCD									
 	out PORTE, temp			;PORTE is for the motor and backlight
 	clr temp
-	out PORTC, temp  		;BLANK the LED bar
-	out PORTG, temp 		;BLANK the top LEDs on LED bar
 	out PORTB, temp
 	;;;;;;;;prepare ADC;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	ldi temp, (1 << REFS0) | (0 << ADLAR) | (0 << MUX0);Set ADC reference
+	ldi temp, (1 << REFS0) | (0 << ADLAR) | (0 << MUX0) ;Set ADC reference
 	sts ADMUX, temp
-	ldi temp, (1 << MUX5); 
+	ldi temp, (1 << MUX5); prepare MUX
 	sts ADCSRB, temp
 	ldi temp,  (1 << ADATE) | (1 << ADIE) | (5 << ADPS0); FREE RUNNING, INTERRUPT ENABLED, PRESCALER
 	sts ADCSRA, temp
@@ -253,10 +253,10 @@ RESET:
 
 	
 halt:
-	cpi gameShouldReset, 1
+	cpi gameShouldReset, 1 ;should game reset?
 	brne halt 
 	cli	;don't disturb me while I reset
-	rjmp gameRestart
+	rjmp gameRestart ;yes we should reset (set by RESET button, and buttons when at win/lose)
 
 Timer0OVF: ;This is an 8-bit timer - Game loop.
 	;timer prologue
@@ -341,7 +341,7 @@ countdownFunc:
 	ldii running, 1	;backlight should be on
 	ldii screenStageFol, stage_countdown 
 	do_lcd_write_str str_countdown_msg
-	ldi temp, 3
+	ldi temp, 3	;begin to write countdown to screen
 	addi temp, '0'
 	do_lcd_data temp
 	do_lcd_data_i '.'
@@ -358,7 +358,6 @@ potResetFunc:
 
 	continuePotResetFunc:
 
-;	ldii running, 1 ;backlight should be on
 	ldii screenStageFol, stage_pot_reset
 	enable_ADC		;ADC should be on
 
@@ -1187,7 +1186,6 @@ randomizePotLocation:
 	pop temp2
 	pop temp
 ret
-
 
 
 ;a macro for the function below to prevent

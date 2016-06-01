@@ -198,7 +198,9 @@
 	pop temp
 .endmacro
 
-
+;write to eeprom
+;pass in the address to write to, and the register
+;that cotains data you want to store
 .macro writeToEEPROM
 push temp
 push temp2
@@ -208,7 +210,7 @@ push temp2
 		; Wait for completion of previous write
 		sbic EECR,EEPE
 		rjmp EEPROM_write
-		; Set up address (r18:r17) in address register
+		; Set up address in address register
 		out EEARH, temp
 		out EEARL, temp2
 		; Write data to Data Register
@@ -221,6 +223,10 @@ pop temp2
 pop temp
 .endmacro
 
+
+;read from eeprom
+;pass in adress you want to read from
+;stores data into temp register
 .macro readFromEEPROM
 push temp2
 	ldi temp, 0

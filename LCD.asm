@@ -4,6 +4,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;constants
 .equ LCD_RS = 7
 .equ LCD_E = 6
 .equ LCD_RW = 5
@@ -25,33 +26,33 @@ lcd_store_custom:
 	push rmask
 	clr col
 
-	lcdStoreLoop:
+	lcdStoreLoop: ;loop to store into LCD 
 
 		ldi temp, (0b01 << 6)
 		mov row, col
 		mov rmask, temp2
 
-		andi rmask, 0b111
+		andi rmask, 0b111 ;mask the numbers needed
 
 		lsl rmask
 		lsl rmask
-		lsl rmask
+		lsl rmask ;move into position
 
 		andi row, 0b111
 		or rmask, row
 		or temp, rmask
 
-		rcall lcd_set_pos
+		rcall lcd_set_pos  ;set pos in RAM
 
 		lpm temp, Z+
-		andi temp, 0b00011111
+		andi temp, 0b00011111 ;get numbers needed
 
 		rcall lcd_set_dat
 
-		inc col
+		inc col ;increment store point
 
 		cpi col, 8
-		brne lcdStoreLoop
+		brne lcdStoreLoop ;loop if not done
 
 		pop rmask
 		pop col
@@ -143,6 +144,7 @@ lcd_wait_loop:
 .equ DELAY_1MS = F_CPU / 4 / 1000 - 4
 ; 4 cycles per iteration - setup/call-return overhead
 
+;generic sleep timers 
 sleep_1ms:
 	push r24
 	push r25
