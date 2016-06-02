@@ -134,7 +134,16 @@ initialiseBacklightTimer:
 	pop temp
 ret
 
-;set LCD to begin to fade in
+;set LCD to begin to fade out
+backlightFadeOut:
+	push temp
+
+	ldi temp, LCD_BACKLIGHT_FADEOUT			; set backlight fade state to fade out
+	sts BacklightFade, temp
+
+	pop temp
+ret
+
 backlightFadeIn:
 	push temp
 
@@ -149,13 +158,5 @@ backlightFadeIn:
 	pop temp
 ret
 
-;set LCD to begin to fade out
-backlightFadeOut:
-	push temp
-
-	ldi temp, LCD_BACKLIGHT_FADEOUT			; set backlight fade state to fade out
-	sts BacklightFade, temp
-
-	pop temp
-ret
+;set LCD to begin to fade in
 
