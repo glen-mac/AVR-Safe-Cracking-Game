@@ -7,7 +7,9 @@ In this project you will develop a safe-cracking game to be played on the AVR de
 The system will need to maintain game state, take input from the player, and provide audio-visual feedback.
 
 Your system should satisfy the following requirements. Marks will be allocated amongst the points listed in the following section. More marks will be given to more difficult features.  Some bonus marks will be awarded for extensions beyond the spec.
+
 ***
+
 ## Core requirements: (80%)
 
 ### Start Screen
@@ -182,15 +184,17 @@ D | 6
 
 - You will need to submit the hard copies of the above documents during the demonstration. You will also need to bring a copy of your source code on a flash drive or similar.
 
+***
+
 ### Marking Scheme
 
 - This project is worth 100 marks. The marking scheme will be as follows:
 
--   System Implementation (80 marks)
+	1. System Implementation (80 marks)
 
--   Design Manual (10 marks)
+	2. Design Manual (10 marks)
 
--   User Manual (5 marks)
+	3. User Manual (5 marks)
 
--  Coding style and commenting (5 marks)
+	4. Coding style and commenting (5 marks)
 
