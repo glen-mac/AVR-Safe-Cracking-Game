@@ -152,11 +152,11 @@ D | 6
 
 - You will need to submit the following items:
 
- 1)   A soft copy of your complete source (all .asm files). Your program should be well commented.
+1.   A soft copy of your complete source (all .asm files). Your program should be well commented.
 
 2.  A hard copy of your user manual. The user manual describes how a user plays your game, including how to wire up the AVR lab board. Make sure you indicate which buttons performeach action and how the LED and LCD displays should be interpreted.
 
- 3.  A hard copy of the design manual. The design manual describes how you designed the game system. It must contain the following components:
+3.  A hard copy of the design manual. The design manual describes how you designed the game system. It must contain the following components:
 
     a.  System flow control. This component describes the flow control of the system at the module level using a diagram.
 
