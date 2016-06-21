@@ -147,7 +147,9 @@ C | 10
 D | 6
 
 - The difficulty may be displayed while on the start screen however you like.
+
 ***
+
 ### Submission Information
 
 - You will need to submit the following items:
@@ -169,7 +171,9 @@ D | 6
 - Overall, a person with knowledge about the subject and board should understand how your system is designed after reading this design manual.
 
 - Be sure to clearly specify your name, student ID, and lab group on all submitted documentation.
+
 ***
+
 ### Demonstration
 
 - You will need to demonstrate your working project to an assessor on Thursday or Friday of week 13.
